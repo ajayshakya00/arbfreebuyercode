@@ -1,0 +1,366 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ARB Free Buyer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  width:360px;
+  background:#130e17;
+  color:#f0ecf2;
+  font:13px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:16px;
+  user-select:none;
+}
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:14px;
+  padding-bottom:12px;
+  border-bottom:1px solid #291e2e;
+}
+.title-box h1{
+  font-size:17px;
+  font-weight:800;
+  background:linear-gradient(135deg,#ff3e91 0%,#ff82bf 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  letter-spacing:-0.3px;
+}
+.title-box small{
+  font-size:11px;
+  color:#8e7d92;
+  font-weight:500;
+}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 10px;
+  border-radius:12px;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:0.3px;
+}
+.badge-idle{
+  background:#231929;
+  color:#9a879e;
+  border:1px solid #37273f;
+}
+.badge-running{
+  background:rgba(0,230,118,0.15);
+  color:#00e676;
+  border:1px solid rgba(0,230,118,0.4);
+  box-shadow:0 0 10px rgba(0,230,118,0.25);
+  animation:pulseBadge 1.8s infinite ease-in-out;
+}
+@keyframes pulseBadge{
+  0%,100%{opacity:0.9}
+  50%{opacity:1;box-shadow:0 0 14px rgba(0,230,118,0.45)}
+}
+.card{
+  background:#1e1524;
+  border:1px solid #33233c;
+  border-radius:12px;
+  padding:12px;
+  margin-bottom:10px;
+}
+.label{
+  display:block;
+  color:#aa95b0;
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  margin-bottom:6px;
+}
+.segmented-control{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px;
+  background:#150f1a;
+  padding:3px;
+  border-radius:10px;
+  margin-bottom:10px;
+  border:1px solid #2d1f35;
+}
+.seg-btn{
+  background:transparent;
+  color:#9a879e;
+  border:0;
+  padding:7px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.seg-btn.active{
+  background:#ef398b;
+  color:#fff;
+  box-shadow:0 2px 8px rgba(239,57,139,0.35);
+}
+.input-wrap{
+  position:relative;
+}
+.currency{
+  position:absolute;
+  left:10px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#7e6c82;
+  font-weight:700;
+}
+input,select{
+  width:100%;
+  background:#150f1a;
+  color:#fff;
+  border:1px solid #3b2847;
+  border-radius:8px;
+  padding:8px 10px;
+  font-size:13px;
+  outline:none;
+  transition:border-color 0.2s,box-shadow 0.2s;
+}
+input:focus,select:focus{
+  border-color:#ef398b;
+  box-shadow:0 0 0 2px rgba(239,57,139,0.25);
+}
+.input-wrap input{
+  padding-left:24px;
+}
+.grid-2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.toggle-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.toggle-info b{
+  font-size:13px;
+  color:#f5f0f7;
+}
+.toggle-info small{
+  display:block;
+  color:#8e7d92;
+  font-size:11px;
+}
+.switch{
+  position:relative;
+  display:inline-block;
+  width:38px;
+  height:22px;
+  flex-shrink:0;
+}
+.switch input{
+  opacity:0;
+  width:0;
+  height:0;
+}
+.slider{
+  position:absolute;
+  cursor:pointer;
+  top:0;left:0;right:0;bottom:0;
+  background-color:#2a1b33;
+  transition:0.25s;
+  border-radius:22px;
+  border:1px solid #432b50;
+}
+.slider:before{
+  position:absolute;
+  content:"";
+  height:16px;
+  width:16px;
+  left:2px;
+  bottom:2px;
+  background-color:#c9b8cf;
+  transition:0.25s;
+  border-radius:50%;
+}
+input:checked + .slider{
+  background-color:#ef398b;
+  border-color:#ef398b;
+}
+input:checked + .slider:before{
+  transform:translateX(16px);
+  background-color:#fff;
+}
+.btn-toggle{
+  width:100%;
+  border:0;
+  border-radius:10px;
+  padding:12px;
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  letter-spacing:0.4px;
+  transition:all 0.25s cubic-bezier(0.4,0,0.2,1);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.4);
+}
+.btn-start{
+  background:linear-gradient(135deg,#ff3e91 0%,#e0186e 100%);
+  color:#fff;
+}
+.btn-start:hover{
+  background:linear-gradient(135deg,#ff539d 0%,#f02279 100%);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px rgba(239,57,139,0.45);
+}
+.btn-start:active{
+  transform:translateY(1px);
+}
+.btn-stop{
+  background:linear-gradient(135deg,#e53935 0%,#b71c1c 100%);
+  color:#fff;
+  box-shadow:0 4px 14px rgba(229,57,53,0.35);
+}
+.btn-stop:hover{
+  background:linear-gradient(135deg,#f44336 0%,#c62828 100%);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px rgba(229,57,53,0.5);
+}
+.btn-stop:active{
+  transform:translateY(1px);
+}
+.footer{
+  margin-top:14px;
+  text-align:center;
+  padding-top:10px;
+  border-top:1px solid #25192c;
+}
+.btn-source{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  background:#1e1424;
+  color:#d4c4d9;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:700;
+  padding:7px 16px;
+  border-radius:8px;
+  border:1px solid #3b2847;
+  cursor:pointer;
+  transition:all 0.2s cubic-bezier(0.4,0,0.2,1);
+  box-shadow:0 2px 6px rgba(0,0,0,0.25);
+}
+.btn-source:hover{
+  background:#2b1a36;
+  color:#fff;
+  border-color:#ff3e91;
+  box-shadow:0 3px 12px rgba(255,62,145,0.25);
+  transform:translateY(-1px);
+}
+.btn-source:active{
+  transform:translateY(1px);
+}
+.btn-source svg{
+  width:14px;
+  height:14px;
+  fill:currentColor;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title-box">
+    <h1>ARB Free Buyer</h1>
+    <small>Payjora Auto-Order Sniper</small>
+  </div>
+  <div id="statusBadge" class="badge badge-idle">● IDLE</div>
+</div>
+
+<div class="card">
+  <div class="segmented-control">
+    <button id="fixedBtn" class="seg-btn">Fixed Amount</button>
+    <button id="rangeBtn" class="seg-btn active">Range</button>
+  </div>
+  <div id="fixedBox" style="display:none">
+    <label class="label">Fixed Amount</label>
+    <div class="input-wrap">
+      <span class="currency">₹</span>
+      <input id="fixed" type="number" min="100" max="50000" value="100">
+    </div>
+  </div>
+  <div id="rangeBox">
+    <label class="label">Amount Range (₹)</label>
+    <div class="grid-2">
+      <div class="input-wrap">
+        <span class="currency">₹</span>
+        <input id="min" type="number" min="100" max="50000" value="100" placeholder="Min">
+      </div>
+      <div class="input-wrap">
+        <span class="currency">₹</span>
+        <input id="max" type="number" min="100" max="50000" value="50000" placeholder="Max">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="toggle-row" style="margin-bottom:10px">
+    <div class="toggle-info">
+      <b>Auto Refresh</b>
+      <small>Requests fresh orders continuously</small>
+    </div>
+    <label class="switch">
+      <input id="refresh" type="checkbox" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="grid-2">
+    <div>
+      <label class="label">Target Tab</label>
+      <select id="tabSelect">
+        <option value="OTP-UPI">OTP-UPI (+5%)</option>
+        <option value="UPI">UPI</option>
+        <option value="BANK">BANK (+6%)</option>
+        <option value="Quick">Quick</option>
+        <option value="USDT">USDT</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">Latency (ms)</label>
+      <input id="latency" type="number" min="200" step="50" value="500">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="toggle-row">
+    <div class="toggle-info">
+      <b>Auto Buy</b>
+      <small>Instantly clicks Buy when match is found</small>
+    </div>
+    <label class="switch">
+      <input id="autoBuy" type="checkbox" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+</div>
+
+<button id="toggleBtn" class="btn-toggle btn-start">
+  ▶ Start Monitoring
+</button>
+
+<div class="footer">
+  <a id="sourceLink" href="https://github.com/ajayshakya00/arbfreebuyercode" class="btn-source" title="View Source Code on GitHub">
+    <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>Source Code</span>
+  </a>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
