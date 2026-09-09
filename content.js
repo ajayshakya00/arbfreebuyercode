@@ -205,10 +205,20 @@
     stop();
     removeOldDebug();
     settings = Object.assign(settings, s || {});
-    settings.latency = Math.max(200, Number(settings.latency) || 500);
-    settings.min = Math.max(100, Math.min(50000, Number(settings.min) || 100));
-    settings.max = Math.max(100, Math.min(50000, Number(settings.max) || 50000));
-    settings.fixed = Math.max(100, Math.min(50000, Number(settings.fixed) || 100));
+    const parsedLatency = Number(settings.latency);
+    settings.latency = isNaN(parsedLatency) ? 500 : Math.max(0, parsedLatency);
+    settings.fixed = isNaN(Number(settings.fixed)) ? 0 : Math.max(0, Number(settings.fixed));
+    let minVal = isNaN(Number(settings.min)) ? 0 : Math.max(0, Number(settings.min));
+    let maxVal = isNaN(Number(settings.max)) ? minVal + 1 : Math.max(0, Number(settings.max));
+    if (minVal >= maxVal) {
+      if (minVal > maxVal) {
+        [minVal, maxVal] = [maxVal, minVal];
+      } else {
+        maxVal = minVal + 1;
+      }
+    }
+    settings.min = minVal;
+    settings.max = maxVal;
     settings.tab = settings.tab || "OTP-UPI";
     settings.autoBuy = settings.autoBuy !== false;
 
@@ -228,14 +238,14 @@
 
         setTimeout(() => {
           if (running) scanOrders();
-        }, Math.min(250, Math.max(50, settings.latency / 3)));
+        }, Math.min(250, Math.max(10, Math.floor(settings.latency / 3))));
       }, settings.latency);
     }
 
     if (running) {
       scanTimer = setInterval(() => {
         if (running) scanOrders();
-      }, Math.max(300, Math.min(1000, settings.latency)));
+      }, Math.max(100, Math.min(1000, settings.latency || 100)));
     }
   }
 

@@ -7,8 +7,8 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{
   width:360px;
-  background:#130e17;
-  color:#f0ecf2;
+  background:#0b120f;
+  color:#eaf5ee;
   font:13px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   padding:16px;
   user-select:none;
@@ -19,19 +19,32 @@ body{
   align-items:center;
   margin-bottom:14px;
   padding-bottom:12px;
-  border-bottom:1px solid #291e2e;
+  border-bottom:1px solid #1a2e23;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.logo{
+  width:36px;
+  height:36px;
+  border-radius:9px;
+  object-fit:cover;
+  border:1px solid #21382c;
+  box-shadow:0 2px 8px rgba(0,230,118,0.2);
 }
 .title-box h1{
   font-size:17px;
   font-weight:800;
-  background:linear-gradient(135deg,#ff3e91 0%,#ff82bf 100%);
+  background:linear-gradient(135deg,#00e676 0%,#69f0ae 100%);
   -webkit-background-clip:text;
   -webkit-text-fill-color:transparent;
   letter-spacing:-0.3px;
 }
 .title-box small{
   font-size:11px;
-  color:#8e7d92;
+  color:#799a88;
   font-weight:500;
 }
 .badge{
@@ -45,9 +58,9 @@ body{
   letter-spacing:0.3px;
 }
 .badge-idle{
-  background:#231929;
-  color:#9a879e;
-  border:1px solid #37273f;
+  background:#14221a;
+  color:#7da590;
+  border:1px solid #233b2e;
 }
 .badge-running{
   background:rgba(0,230,118,0.15);
@@ -61,34 +74,41 @@ body{
   50%{opacity:1;box-shadow:0 0 14px rgba(0,230,118,0.45)}
 }
 .card{
-  background:#1e1524;
-  border:1px solid #33233c;
+  background:#121c17;
+  border:1px solid #1e3328;
   border-radius:12px;
   padding:12px;
   margin-bottom:10px;
 }
 .label{
   display:block;
-  color:#aa95b0;
+  color:#7fa893;
   font-size:11px;
   font-weight:700;
   text-transform:uppercase;
   letter-spacing:0.5px;
   margin-bottom:6px;
 }
+.label .hint{
+  text-transform:none;
+  font-size:10px;
+  font-weight:600;
+  color:#668a76;
+  margin-left:3px;
+}
 .segmented-control{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:4px;
-  background:#150f1a;
+  background:#0b130f;
   padding:3px;
   border-radius:10px;
   margin-bottom:10px;
-  border:1px solid #2d1f35;
+  border:1px solid #1a2c22;
 }
 .seg-btn{
   background:transparent;
-  color:#9a879e;
+  color:#7fa893;
   border:0;
   padding:7px;
   border-radius:8px;
@@ -98,9 +118,9 @@ body{
   transition:all 0.2s;
 }
 .seg-btn.active{
-  background:#ef398b;
-  color:#fff;
-  box-shadow:0 2px 8px rgba(239,57,139,0.35);
+  background:linear-gradient(135deg,#00e676 0%,#00c853 100%);
+  color:#06190f;
+  box-shadow:0 2px 10px rgba(0,230,118,0.35);
 }
 .input-wrap{
   position:relative;
@@ -110,14 +130,14 @@ body{
   left:10px;
   top:50%;
   transform:translateY(-50%);
-  color:#7e6c82;
+  color:#5c806e;
   font-weight:700;
 }
 input,select{
   width:100%;
-  background:#150f1a;
-  color:#fff;
-  border:1px solid #3b2847;
+  background:#0b130f;
+  color:#f0faf4;
+  border:1px solid #21382c;
   border-radius:8px;
   padding:8px 10px;
   font-size:13px;
@@ -125,8 +145,8 @@ input,select{
   transition:border-color 0.2s,box-shadow 0.2s;
 }
 input:focus,select:focus{
-  border-color:#ef398b;
-  box-shadow:0 0 0 2px rgba(239,57,139,0.25);
+  border-color:#00e676;
+  box-shadow:0 0 0 2px rgba(0,230,118,0.25);
 }
 .input-wrap input{
   padding-left:24px;
@@ -143,11 +163,11 @@ input:focus,select:focus{
 }
 .toggle-info b{
   font-size:13px;
-  color:#f5f0f7;
+  color:#f0faf4;
 }
 .toggle-info small{
   display:block;
-  color:#8e7d92;
+  color:#799a88;
   font-size:11px;
 }
 .switch{
@@ -166,10 +186,10 @@ input:focus,select:focus{
   position:absolute;
   cursor:pointer;
   top:0;left:0;right:0;bottom:0;
-  background-color:#2a1b33;
+  background-color:#17261f;
   transition:0.25s;
   border-radius:22px;
-  border:1px solid #432b50;
+  border:1px solid #254032;
 }
 .slider:before{
   position:absolute;
@@ -178,17 +198,17 @@ input:focus,select:focus{
   width:16px;
   left:2px;
   bottom:2px;
-  background-color:#c9b8cf;
+  background-color:#7fa893;
   transition:0.25s;
   border-radius:50%;
 }
 input:checked + .slider{
-  background-color:#ef398b;
-  border-color:#ef398b;
+  background-color:#00e676;
+  border-color:#00e676;
 }
 input:checked + .slider:before{
   transform:translateX(16px);
-  background-color:#fff;
+  background-color:#061a10;
 }
 .btn-toggle{
   width:100%;
@@ -207,13 +227,13 @@ input:checked + .slider:before{
   box-shadow:0 4px 14px rgba(0,0,0,0.4);
 }
 .btn-start{
-  background:linear-gradient(135deg,#ff3e91 0%,#e0186e 100%);
-  color:#fff;
+  background:linear-gradient(135deg,#00e676 0%,#00b848 100%);
+  color:#06190f;
 }
 .btn-start:hover{
-  background:linear-gradient(135deg,#ff539d 0%,#f02279 100%);
+  background:linear-gradient(135deg,#1aff87 0%,#00cc50 100%);
   transform:translateY(-1px);
-  box-shadow:0 6px 18px rgba(239,57,139,0.45);
+  box-shadow:0 6px 18px rgba(0,230,118,0.4);
 }
 .btn-start:active{
   transform:translateY(1px);
@@ -235,30 +255,30 @@ input:checked + .slider:before{
   margin-top:14px;
   text-align:center;
   padding-top:10px;
-  border-top:1px solid #25192c;
+  border-top:1px solid #1a2e23;
 }
 .btn-source{
   display:inline-flex;
   align-items:center;
   justify-content:center;
   gap:7px;
-  background:#1e1424;
-  color:#d4c4d9;
+  background:#121c17;
+  color:#b2d4c3;
   text-decoration:none;
   font-size:12px;
   font-weight:700;
   padding:7px 16px;
   border-radius:8px;
-  border:1px solid #3b2847;
+  border:1px solid #21382c;
   cursor:pointer;
   transition:all 0.2s cubic-bezier(0.4,0,0.2,1);
   box-shadow:0 2px 6px rgba(0,0,0,0.25);
 }
 .btn-source:hover{
-  background:#2b1a36;
-  color:#fff;
-  border-color:#ff3e91;
-  box-shadow:0 3px 12px rgba(255,62,145,0.25);
+  background:#182821;
+  color:#00e676;
+  border-color:#00e676;
+  box-shadow:0 3px 12px rgba(0,230,118,0.25);
   transform:translateY(-1px);
 }
 .btn-source:active{
@@ -274,9 +294,12 @@ input:checked + .slider:before{
 <body>
 
 <div class="header">
-  <div class="title-box">
-    <h1>ARB Free Buyer</h1>
-    <small>Payjora Auto-Order Sniper</small>
+  <div class="brand">
+    <img src="logo.png" alt="Logo" class="logo">
+    <div class="title-box">
+      <h1>ARB Free Buyer</h1>
+      <small>Payjora Auto-Order Sniper</small>
+    </div>
   </div>
   <div id="statusBadge" class="badge badge-idle">● IDLE</div>
 </div>
@@ -290,19 +313,19 @@ input:checked + .slider:before{
     <label class="label">Fixed Amount</label>
     <div class="input-wrap">
       <span class="currency">₹</span>
-      <input id="fixed" type="number" min="100" max="50000" value="100">
+      <input id="fixed" type="number" min="0" step="any" value="100" placeholder="Amount">
     </div>
   </div>
   <div id="rangeBox">
-    <label class="label">Amount Range (₹)</label>
+    <label class="label">Amount Range (₹) <span class="hint">(min &lt; max)</span></label>
     <div class="grid-2">
       <div class="input-wrap">
         <span class="currency">₹</span>
-        <input id="min" type="number" min="100" max="50000" value="100" placeholder="Min">
+        <input id="min" type="number" min="0" step="any" value="100" placeholder="Min">
       </div>
       <div class="input-wrap">
         <span class="currency">₹</span>
-        <input id="max" type="number" min="100" max="50000" value="50000" placeholder="Max">
+        <input id="max" type="number" min="0" step="any" value="50000" placeholder="Max">
       </div>
     </div>
   </div>
@@ -331,8 +354,8 @@ input:checked + .slider:before{
       </select>
     </div>
     <div>
-      <label class="label">Latency (ms)</label>
-      <input id="latency" type="number" min="200" step="50" value="500">
+      <label class="label">Latency (ms) <span class="hint">(min 200)</span></label>
+      <input id="latency" type="number" min="0" step="10" value="500">
     </div>
   </div>
 </div>
@@ -351,7 +374,7 @@ input:checked + .slider:before{
 </div>
 
 <button id="toggleBtn" class="btn-toggle btn-start">
-  ▶ Start Monitoring
+  ▶ Start Buying
 </button>
 
 <div class="footer">
