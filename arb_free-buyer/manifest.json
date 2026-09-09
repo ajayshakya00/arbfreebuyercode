@@ -3,21 +3,11 @@
   "name": "ARB Free Buyer",
   "version": "2.4.0",
   "description": "ARB Free Buyer - Automated order monitor and sniper for Payjora (OTP-UPI, UPI, BANK, Quick, USDT).",
-
-  "browser_specific_settings": {
-    "gecko": {
-      "data_collection_permissions": {
-        "required": ["none"]
-      }
-    }
-  },
-
   "permissions": [
     "storage",
     "tabs",
     "https://uidif.payjora.com/*"
   ],
-
   "browser_action": {
     "default_title": "ARB Free Buyer",
     "default_popup": "popup.html",
@@ -27,26 +17,17 @@
       "128": "icon128.png"
     }
   },
-
   "content_scripts": [
     {
-      "matches": [
-        "https://uidif.payjora.com/*"
-      ],
-      "js": [
-        "content.js"
-      ],
+      "matches": ["https://uidif.payjora.com/*"],
+      "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],
-
   "background": {
-    "scripts": [
-      "background.js"
-    ],
+    "scripts": ["background.js"],
     "persistent": false
   },
-
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
