@@ -1,1 +1,0 @@
-// Background service script
