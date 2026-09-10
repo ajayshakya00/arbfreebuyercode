@@ -108,9 +108,73 @@ $("rangeBtn").onclick = () => {
   savePreferences(true);
 };
 
-async function getActivePayjoraTab() {
-  const tabs = await api.tabs.query({active: true, currentWindow: true});
-  return tabs.find(t => /^https:\/\/uidif\.payjora\.com\//.test(t.url || ""));
+async function getActiveTab() {
+  const extApi = typeof browser !== "undefined" ? browser : chrome;
+  try {
+    const tabs = await extApi.tabs.query({ active: true, lastFocusedWindow: true });
+    if (tabs && tabs[0]) return tabs[0];
+  } catch (e) {}
+
+  try {
+    const tabs = await extApi.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0]) return tabs[0];
+  } catch (e) {}
+
+  try {
+    const tabs = await extApi.tabs.query({ active: true });
+    if (tabs && tabs[0]) return tabs[0];
+  } catch (e) {}
+
+  return null;
+}
+
+async function sendTabMessage(tabId, message) {
+  const isFirefox = typeof browser !== "undefined" && Boolean(browser.tabs);
+
+  const doSend = () => {
+    if (isFirefox) {
+      return browser.tabs.sendMessage(tabId, message);
+    }
+    return new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  };
+
+  const doInject = () => {
+    if (isFirefox) {
+      return browser.tabs.executeScript(tabId, { file: "content.js" });
+    }
+    return new Promise((resolve, reject) => {
+      chrome.tabs.executeScript(tabId, { file: "content.js" }, (results) => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve(results);
+        }
+      });
+    });
+  };
+
+  try {
+    return await doSend();
+  } catch (err) {
+    // Content script not yet present in tab; auto-inject and retry
+    console.log("Auto-injecting content.js into tab " + tabId);
+    try {
+      await doInject();
+      await new Promise(r => setTimeout(r, 120));
+      return await doSend();
+    } catch (injectErr) {
+      console.error("Auto-inject failed:", injectErr);
+      throw injectErr;
+    }
+  }
 }
 
 function updateUiState(running, tabName) {
@@ -133,33 +197,47 @@ function updateUiState(running, tabName) {
 
 async function handleToggle() {
   savePreferences(true);
-  const tab = await getActivePayjoraTab();
-  if (!tab) {
+  const tab = await getActiveTab();
+  if (!tab || !tab.id) {
     const badge = $("statusBadge");
-    badge.textContent = "Payjora tab not open";
+    badge.textContent = "No active tab";
     badge.className = "badge badge-idle";
     return;
   }
 
-  if (isRunning) {
-    // Send STOP
-    await api.tabs.sendMessage(tab.id, { type: "STOP" });
-    updateUiState(false);
-  } else {
-    // Send START
-    const s = clampSettings(true);
-    await api.tabs.sendMessage(tab.id, {
-      type: "START",
-      mode,
-      min: s.min,
-      max: s.max,
-      fixed: s.fixed,
-      latency: s.latency,
-      tab: s.tab,
-      autoRefresh: $("refresh").checked,
-      autoBuy: $("autoBuy").checked
-    });
-    updateUiState(true, s.tab);
+  if (tab.url && !/^https?:\/\//i.test(tab.url)) {
+    const badge = $("statusBadge");
+    badge.textContent = "Open website first";
+    badge.className = "badge badge-idle";
+    return;
+  }
+
+  try {
+    if (isRunning) {
+      // Send STOP
+      await sendTabMessage(tab.id, { type: "STOP" });
+      updateUiState(false);
+    } else {
+      // Send START
+      const s = clampSettings(true);
+      await sendTabMessage(tab.id, {
+        type: "START",
+        mode,
+        min: s.min,
+        max: s.max,
+        fixed: s.fixed,
+        latency: s.latency,
+        tab: s.tab,
+        autoRefresh: $("refresh").checked,
+        autoBuy: $("autoBuy").checked
+      });
+      updateUiState(true, s.tab);
+    }
+  } catch (err) {
+    console.error("Failed to communicate with tab:", err);
+    const badge = $("statusBadge");
+    badge.textContent = err.message ? err.message.slice(0, 20) : "Cannot connect";
+    badge.className = "badge badge-idle";
   }
 }
 
@@ -203,14 +281,12 @@ $("sourceLink").onclick = (e) => {
   }
 
   try {
-    const tab = await getActivePayjoraTab();
-    if (tab) {
-      api.tabs.sendMessage(tab.id, { type: "GET_STATUS" }, (res) => {
-        if (api.runtime.lastError) return;
-        if (res && typeof res.running === "boolean") {
-          updateUiState(res.running, res.tab);
-        }
-      });
+    const tab = await getActiveTab();
+    if (tab && tab.id && tab.url && /^https?:\/\//i.test(tab.url)) {
+      const res = await sendTabMessage(tab.id, { type: "GET_STATUS" });
+      if (res && typeof res.running === "boolean") {
+        updateUiState(res.running, res.tab);
+      }
     }
   } catch (e) {}
 })();

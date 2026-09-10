@@ -14,6 +14,13 @@
     autoBuy: true
   };
 
+  // If already loaded in this page context, clean up previous instance
+  if (window.__arbBuyerInstance) {
+    try {
+      window.__arbBuyerInstance.stop();
+    } catch(e) {}
+  }
+
   // Ensure any lingering debug box from previous versions is completely removed
   function removeOldDebug() {
     try {
@@ -130,7 +137,7 @@
   }
 
   function getOrderCards() {
-    const items = [...document.querySelectorAll(".item.mb32, .x-buyList-list .item, [platformorder]")];
+    const items = [...document.querySelectorAll(".item.mb32, .x-buyList-list .item, [platformorder], .van-cell, .list-item")];
     const seenCards = new Set();
     const result = [];
     for (const el of items) {
@@ -142,11 +149,28 @@
         }
       }
     }
+    if (result.length === 0) {
+      const allButtons = [...document.querySelectorAll("button, .van-button, .btn, .x-btn")];
+      for (const btn of allButtons) {
+        if (/buy/i.test(btn.textContent || "")) {
+          const card = btn.closest("[platformorder]") ||
+                       btn.closest(".item") ||
+                       btn.closest(".van-cell") ||
+                       btn.closest("li") ||
+                       btn.parentElement?.parentElement ||
+                       btn.parentElement;
+          if (card && !seenCards.has(card)) {
+            seenCards.add(card);
+            result.push(card);
+          }
+        }
+      }
+    }
     return result;
   }
 
   function parseAmount(card) {
-    const amountNode = card.querySelector(".amount");
+    const amountNode = card.querySelector(".amount, [class*='amount'], [class*='price']");
     if (amountNode) {
       const text = amountNode.textContent || "";
       const m = text.replace(/,/g, "").match(/([0-9]+(?:\.[0-9]+)?)/);
@@ -249,24 +273,42 @@
     }
   }
 
-  api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  window.__arbBuyerInstance = {
+    stop,
+    start,
+    getStatus: () => ({ running, tab: settings.tab || "OTP-UPI" })
+  };
+
+  if (window.__arbBuyerMessageListener) {
+    try {
+      api.runtime.onMessage.removeListener(window.__arbBuyerMessageListener);
+    } catch (e) {}
+  }
+
+  const messageHandler = (msg, sender, sendResponse) => {
     if (!msg) return;
     if (msg.type === "START") {
       start(msg);
       if (sendResponse) sendResponse({ ok: true });
+      return Promise.resolve({ ok: true });
     } else if (msg.type === "STOP") {
       stop();
       if (sendResponse) sendResponse({ ok: true });
+      return Promise.resolve({ ok: true });
     } else if (msg.type === "CLICK_TAB") {
       clickTargetTab();
       if (sendResponse) sendResponse({ ok: true });
+      return Promise.resolve({ ok: true });
     } else if (msg.type === "GET_STATUS") {
-      if (sendResponse) {
-        sendResponse({
-          running,
-          tab: settings.tab || "OTP-UPI"
-        });
-      }
+      const res = {
+        running,
+        tab: settings.tab || "OTP-UPI"
+      };
+      if (sendResponse) sendResponse(res);
+      return Promise.resolve(res);
     }
-  });
+  };
+
+  window.__arbBuyerMessageListener = messageHandler;
+  api.runtime.onMessage.addListener(messageHandler);
 })();
