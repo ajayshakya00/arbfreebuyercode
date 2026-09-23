@@ -291,6 +291,15 @@ $("sourceLink").onclick = (e) => {
   } catch (e) {}
 })();
 
+// Listen for real-time status updates (e.g. order purchased -> turn off monitoring)
+if (api && api.runtime && api.runtime.onMessage) {
+  api.runtime.onMessage.addListener((msg) => {
+    if (msg && msg.type === "ORDER_PURCHASED") {
+      updateUiState(false);
+    }
+  });
+}
+
 // Persist settings on popup close as safety net
 window.addEventListener("beforeunload", () => savePreferences(true));
 
