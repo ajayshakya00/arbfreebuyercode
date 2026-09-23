@@ -1,5 +1,5 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "ARB Free Buyer",
   "version": "2.5.1",
   "description": "ARB Free Buyer - Automated order monitor and sniper (OTP-UPI, UPI, BANK, Quick, USDT).",
@@ -17,10 +17,14 @@
   "permissions": [
     "storage",
     "tabs",
+    "scripting"
+  ],
+
+  "host_permissions": [
     "<all_urls>"
   ],
 
-  "browser_action": {
+  "action": {
     "default_title": "ARB Free Buyer",
     "default_popup": "popup.html",
     "default_icon": {
@@ -41,13 +45,6 @@
       "run_at": "document_idle"
     }
   ],
-
-  "background": {
-    "scripts": [
-      "background.js"
-    ],
-    "persistent": false
-  },
 
   "icons": {
     "16": "icon16.png",

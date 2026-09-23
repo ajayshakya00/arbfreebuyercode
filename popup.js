@@ -146,19 +146,14 @@ async function sendTabMessage(tabId, message) {
     });
   };
 
-  const doInject = () => {
-    if (isFirefox) {
-      return browser.tabs.executeScript(tabId, { file: "content.js" });
-    }
-    return new Promise((resolve, reject) => {
-      chrome.tabs.executeScript(tabId, { file: "content.js" }, (results) => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-        } else {
-          resolve(results);
-        }
+  const doInject = async () => {
+    const extApi = typeof browser !== "undefined" ? browser : chrome;
+    if (extApi && extApi.scripting && extApi.scripting.executeScript) {
+      return extApi.scripting.executeScript({
+        target: { tabId },
+        files: ["content.js"]
       });
-    });
+    }
   };
 
   try {
