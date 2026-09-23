@@ -246,10 +246,20 @@
 
   function findBuyButton(card) {
     if (!card) return null;
-    const buttons = [...card.querySelectorAll("button, .btn, .x-btn, .van-button")];
-    const buyBtn = buttons.find(b => /buy/i.test(b.textContent || ""));
+    const buttons = [...card.querySelectorAll("button, .btn, .x-btn, .van-button, [class*='btn'], [class*='button']")];
+    const buyBtn = buttons.find(b => /^(buy|sold out)$/i.test((b.textContent || "").trim()) || /buy|sold out/i.test(b.textContent || ""));
     if (buyBtn) return buyBtn;
-    return card.querySelector(".van-button--primary, .x-btn, .btn") || card.querySelector("button") || null;
+
+    const all = [...card.querySelectorAll("*")];
+    const textNode = all.find(el => {
+      const t = (el.textContent || "").trim().toLowerCase();
+      return (t === "buy" || t === "sold out") && el.children.length === 0;
+    });
+    if (textNode) {
+      return textNode.closest("button, .btn, .x-btn, .van-button, [class*='btn'], [class*='button'], div.x-row-middle, div") || textNode;
+    }
+
+    return card.querySelector(".van-button--primary, .x-btn, .btn, button") || null;
   }
 
   function clickBuyButton(card, amount) {
@@ -270,6 +280,8 @@
     btn._lastClickTime = now;
 
     const po = card.getAttribute("platformorder") || "";
+    const orderId = getOrderId(card, amount);
+    lastAttemptedOrder = { id: orderId, po, card, amount, time: now };
     log(`AUTO-BUY: Clicked Buy for ₹${amount || "?"} order=${po}`);
 
     realClick(btn);
@@ -280,6 +292,18 @@
     }
     return true;
   }
+
+  let lastAttemptedOrder = null;
+
+  // Capture manual user clicks as well so if an order fails, it gets blacklisted too
+  document.addEventListener("click", (e) => {
+    const card = e.target.closest("[platformorder], .item");
+    if (!card) return;
+    const po = card.getAttribute("platformorder") || "";
+    const amount = parseAmount(card);
+    const id = getOrderId(card, amount);
+    lastAttemptedOrder = { id, po, card, amount, time: Date.now() };
+  }, true);
 
   function getOrderId(card, amount) {
     if (!card) return "";
@@ -310,7 +334,8 @@
         if (po && failedOrders.has(po)) {
           continue;
         }
-        const cardId = getOrderId(card);
+        const amount = parseAmount(card);
+        const cardId = getOrderId(card, amount);
         if (cardId && failedOrders.has(cardId)) {
           continue;
         }
@@ -334,17 +359,17 @@
     const amountNode = card.querySelector(".amount, [class*='amount'], [class*='price']");
     if (amountNode) {
       const text = amountNode.textContent || "";
-      const m = text.replace(/,/g, "").match(/([0-9]+(?:\\.[0-9]+)?)/);
+      const m = text.replace(/,/g, "").match(/([0-9]+(?:\.[0-9]+)?)/);
       if (m) return Number(m[1]);
     }
 
     // Ignore range text (e.g., "100 - 200") unless explicitly an individual order
     const text = card.textContent || "";
-    if (/\\d+\\s*-\\s*\\d+/.test(text) && !card.getAttribute("platformorder")) {
+    if (/\d+\s*-\s*\d+/.test(text) && !card.getAttribute("platformorder")) {
       return NaN;
     }
 
-    const m = text.replace(/,/g, "").match(/₹\\s*([0-9]+(?:\\.[0-9]+)?)/);
+    const m = text.replace(/,/g, "").match(/₹\s*([0-9]+(?:\.[0-9]+)?)/);
     if (m) return Number(m[1]);
 
     return NaN;
@@ -357,9 +382,9 @@
   }
 
   function findFailureToast() {
-    const toasts = document.querySelectorAll(".van-toast, .van-popup, [class*='toast']");
+    const toasts = document.querySelectorAll(".van-toast, .van-popup, [class*='toast'], .van-toast__text");
     for (const t of toasts) {
-      if (t.getAttribute("data-arb-dismissed") === "true") continue;
+      if (t.getAttribute("data-arb-seen") === "true" || t.closest("[data-arb-seen='true']")) continue;
       const txt = (t.textContent || "").trim();
       if (!txt) continue;
       if (
@@ -371,6 +396,7 @@
         /order.*expired/i.test(txt) ||
         /order.*not exist/i.test(txt) ||
         /order.*invalid/i.test(txt) ||
+        /please buy another order/i.test(txt) ||
         /已被他人购买|已被抢|订单已失效/.test(txt)
       ) {
         return { element: t, text: txt };
@@ -379,26 +405,38 @@
     return null;
   }
 
-  function dismissFailureToasts() {
-    const toasts = document.querySelectorAll(".van-toast, .van-popup, [class*='toast']");
-    for (const t of toasts) {
-      const txt = (t.textContent || "").trim();
-      if (
-        /bought by someone else/i.test(txt) ||
-        /someone else/i.test(txt) ||
-        /already bought/i.test(txt) ||
-        /already taken/i.test(txt) ||
-        /no longer available/i.test(txt) ||
-        /order.*expired/i.test(txt) ||
-        /order.*not exist/i.test(txt) ||
-        /order.*invalid/i.test(txt)
-      ) {
-        t.setAttribute("data-arb-dismissed", "true");
-        try {
-          t.remove();
-        } catch (e) {
-          t.style.display = "none";
+  function disableCardUi(card) {
+    if (!card) return;
+    try {
+      card.setAttribute("data-arb-failed", "true");
+      card.style.setProperty("opacity", "0.6", "important");
+      const btn = findBuyButton(card);
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add("van-button--disabled");
+        btn.style.setProperty("pointer-events", "none", "important");
+        btn.style.setProperty("opacity", "0.4", "important");
+        btn.style.setProperty("filter", "grayscale(60%)", "important");
+        btn.style.setProperty("cursor", "not-allowed", "important");
+        const btnText = btn.querySelector(".van-button__text, .van-button__content") || btn;
+        if (btnText && btnText.textContent.trim().toLowerCase() === "buy") {
+          btnText.textContent = "Sold Out";
         }
+      }
+    } catch (e) {}
+  }
+
+  // Update failed cards in the DOM: dim opacity to 0.4, disable clicks, and label 'Sold Out'
+  function updateFailedCardsUi() {
+    if (failedOrders.size === 0) return;
+    const cards = document.querySelectorAll(".item[platformorder], [platformorder], .item");
+    for (const card of cards) {
+      const po = card.getAttribute("platformorder") ||
+                 (card.querySelector("[platformorder]") ? card.querySelector("[platformorder]").getAttribute("platformorder") : "");
+      const amount = parseAmount(card);
+      const id = getOrderId(card, amount);
+      if ((po && failedOrders.has(po)) || (id && failedOrders.has(id))) {
+        disableCardUi(card);
       }
     }
   }
@@ -536,34 +574,31 @@
   }
 
   function handleOrderFailure(orderId, reason) {
-    if (!running || isPurchased) return;
     log(`Order (${orderId || "?"}) failed: "${reason}". Keeping monitoring active...`);
     if (orderId) {
       failedOrders.add(orderId);
     }
-    if (pendingOrder && pendingOrder.card) {
-      try {
-        pendingOrder.card.setAttribute("data-arb-failed", "true");
-        const btn = findBuyButton(pendingOrder.card);
-        if (btn) {
-          btn.disabled = true;
-          btn.classList.add("van-button--disabled");
-          btn.style.pointerEvents = "none";
-          btn.style.opacity = "0.4";
-          const btnText = btn.querySelector(".van-button__text, .van-button__content") || btn;
-          if (btnText) btnText.textContent = "Sold Out";
-        }
-      } catch (e) {}
+    const attempt = pendingOrder || lastAttemptedOrder;
+    if (attempt) {
+      if (attempt.po) failedOrders.add(attempt.po);
+      if (attempt.id) failedOrders.add(attempt.id);
+      if (attempt.card) {
+        disableCardUi(attempt.card);
+      }
     }
     pendingOrder = null;
-    dismissFailureToasts();
 
-    // Immediately trigger order list refresh to clear already-bought order
+    // Dim and disable any matching failed cards present in the DOM
+    updateFailedCardsUi();
+
+    // NOTE: DO NOT hide or remove the popup toast! It stays visible naturally.
+
+    // Refresh orders to fetch latest available orders
     setTimeout(() => {
       if (running && !isPurchased) {
         refreshOrders();
       }
-    }, 80);
+    }, 120);
   }
 
   function waitForBuyOutcome(attempt) {
@@ -581,6 +616,9 @@
       const failToast = findFailureToast();
       if (failToast) {
         clearInterval(checkTimer);
+        const toastRoot = failToast.element.closest(".van-toast, .van-popup, [class*='toast']") || failToast.element;
+        toastRoot.setAttribute("data-arb-seen", "true");
+        failToast.element.setAttribute("data-arb-seen", "true");
         handleOrderFailure(attempt.id, failToast.text);
         return;
       }
@@ -609,6 +647,9 @@
     // Do nothing on range page
     if (!isIndividualMode()) return;
 
+    // Keep any failed cards dimmed and disabled
+    updateFailedCardsUi();
+
     const cards = getOrderCards();
     if (cards.length === 0) return; // Only process when orders are loaded
     let matchesFound = 0;
@@ -619,6 +660,8 @@
 
       const orderId = getOrderId(card, amount);
       if (failedOrders.has(orderId)) continue;
+      const po = card.getAttribute("platformorder") || "";
+      if (po && failedOrders.has(po)) continue;
 
       matchesFound++;
 
@@ -627,6 +670,7 @@
         if (clicked) {
           pendingOrder = {
             id: orderId,
+            po: po,
             amount: amount,
             card: card,
             timestamp: Date.now()
@@ -647,7 +691,10 @@
 
   function stop() {
     running = false;
+    isPurchased = false;
+    isPaymentClicked = false;
     pendingOrder = null;
+    isRefreshing = false;
     if (timer) clearInterval(timer);
     if (scanTimer) clearInterval(scanTimer);
     timer = scanTimer = null;
@@ -663,7 +710,6 @@
     isPurchased = false;
     isPaymentClicked = false;
     pendingOrder = null;
-    failedOrders.clear();
     removeOldDebug();
     settings = Object.assign(settings, s || {});
     const parsedLatency = Number(settings.latency);
@@ -702,12 +748,19 @@
         autoSelectPaymentMethod();
       }
 
+      // Re-apply disabled/dimmed state to failed cards whenever DOM mutates
+      updateFailedCardsUi();
+
       if (!running || isPurchased) return;
 
       // Check if failure toast appeared
       const failToast = findFailureToast();
-      if (failToast && pendingOrder) {
-        handleOrderFailure(pendingOrder.id, failToast.text);
+      if (failToast) {
+        const toastRoot = failToast.element.closest(".van-toast, .van-popup, [class*='toast']") || failToast.element;
+        toastRoot.setAttribute("data-arb-seen", "true");
+        failToast.element.setAttribute("data-arb-seen", "true");
+        const attempt = pendingOrder || lastAttemptedOrder;
+        handleOrderFailure(attempt ? attempt.id : "", failToast.text);
         return;
       }
 
@@ -764,6 +817,21 @@
       if (running) scanOrders();
     }, 80);
   }
+
+  // Continuous maintenance: keep failed cards dimmed, detect toasts, and handle payment screen
+  setInterval(() => {
+    if (failedOrders.size > 0) {
+      updateFailedCardsUi();
+    }
+    const failToast = findFailureToast();
+    if (failToast) {
+      const toastRoot = failToast.element.closest(".van-toast, .van-popup, [class*='toast']") || failToast.element;
+      toastRoot.setAttribute("data-arb-seen", "true");
+      failToast.element.setAttribute("data-arb-seen", "true");
+      const attempt = pendingOrder || lastAttemptedOrder;
+      handleOrderFailure(attempt ? attempt.id : "", failToast.text);
+    }
+  }, 150);
 
   window.__arbBuyerInstance = {
     stop,
