@@ -310,6 +310,10 @@
         if (po && failedOrders.has(po)) {
           continue;
         }
+        const cardId = getOrderId(card);
+        if (cardId && failedOrders.has(cardId)) {
+          continue;
+        }
         if (findBuyButton(card)) {
           result.push(card);
         }
@@ -540,6 +544,15 @@
     if (pendingOrder && pendingOrder.card) {
       try {
         pendingOrder.card.setAttribute("data-arb-failed", "true");
+        const btn = findBuyButton(pendingOrder.card);
+        if (btn) {
+          btn.disabled = true;
+          btn.classList.add("van-button--disabled");
+          btn.style.pointerEvents = "none";
+          btn.style.opacity = "0.4";
+          const btnText = btn.querySelector(".van-button__text, .van-button__content") || btn;
+          if (btnText) btnText.textContent = "Sold Out";
+        }
       } catch (e) {}
     }
     pendingOrder = null;
