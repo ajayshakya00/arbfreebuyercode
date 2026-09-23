@@ -48,7 +48,10 @@ function savePreferences(updateUi = false) {
     latency: s.latency,
     tab: s.tab,
     refresh: $("refresh").checked,
-    autoBuy: $("autoBuy").checked
+    autoBuy: $("autoBuy").checked,
+    autoPayment: $("autoPayment").checked,
+    paymentMethod: $("paymentMethod").value,
+    customPayment: $("customPayment").value
   };
 
   try {
@@ -79,7 +82,7 @@ async function loadPreferences() {
 
   if (!prefs && api && api.storage && api.storage.local) {
     try {
-      const extStored = await api.storage.local.get(["mode", "min", "max", "fixed", "latency", "refresh", "autoBuy", "tab"]);
+      const extStored = await api.storage.local.get(["mode", "min", "max", "fixed", "latency", "refresh", "autoBuy", "autoPayment", "paymentMethod", "customPayment", "tab"]);
       if (extStored && Object.keys(extStored).length > 0) {
         prefs = extStored;
       }
@@ -224,7 +227,10 @@ async function handleToggle() {
         latency: s.latency,
         tab: s.tab,
         autoRefresh: $("refresh").checked,
-        autoBuy: $("autoBuy").checked
+        autoBuy: $("autoBuy").checked,
+        autoPayment: $("autoPayment").checked,
+        paymentMethod: $("paymentMethod").value,
+        customPayment: $("customPayment").value
       });
       updateUiState(true, s.tab);
     }
@@ -237,6 +243,27 @@ async function handleToggle() {
 }
 
 $("toggleBtn").onclick = handleToggle;
+
+function updatePaymentUi() {
+  const isAutoPay = $("autoPayment").checked;
+  const method = $("paymentMethod").value;
+  $("paymentMethodWrap").style.display = isAutoPay ? "" : "none";
+  $("customPaymentBox").style.display = (isAutoPay && method === "custom") ? "" : "none";
+}
+
+$("autoPayment").addEventListener("change", () => {
+  updatePaymentUi();
+  savePreferences(true);
+});
+
+$("paymentMethod").addEventListener("change", () => {
+  updatePaymentUi();
+  savePreferences(true);
+});
+
+$("customPayment").addEventListener("input", () => savePreferences(false));
+$("customPayment").addEventListener("change", () => savePreferences(true));
+$("customPayment").addEventListener("blur", () => savePreferences(true));
 
 // GitHub source link handler
 $("sourceLink").onclick = (e) => {
@@ -265,9 +292,13 @@ $("sourceLink").onclick = (e) => {
   $("latency").value = s.latency !== undefined && !isNaN(Number(s.latency)) ? Math.max(0, Number(s.latency)) : 500;
   $("refresh").checked = s.refresh !== false;
   $("autoBuy").checked = s.autoBuy !== false;
+  $("autoPayment").checked = s.autoPayment !== false;
+  $("paymentMethod").value = s.paymentMethod || "ANY";
+  $("customPayment").value = s.customPayment || "";
   if (s.tab) $("tabSelect").value = s.tab;
 
   clampSettings(true);
+  updatePaymentUi();
 
   if (mode === "fixed") {
     $("fixedBtn").click();
@@ -291,6 +322,10 @@ if (api && api.runtime && api.runtime.onMessage) {
   api.runtime.onMessage.addListener((msg) => {
     if (msg && msg.type === "ORDER_PURCHASED") {
       updateUiState(false);
+    } else if (msg && msg.type === "PAYMENT_METHOD_CLICKED") {
+      const badge = $("statusBadge");
+      badge.textContent = `PAID (${msg.method || "OK"})`;
+      badge.className = "badge badge-running";
     }
   });
 }

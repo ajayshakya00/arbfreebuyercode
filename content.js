@@ -4,6 +4,7 @@
   let scanTimer = null;
   let running = false;
   let isPurchased = false;
+  let isPaymentClicked = false;
   let pendingOrder = null;
   const failedOrders = new Set();
   let settings = {
@@ -14,7 +15,10 @@
     latency: 500,
     tab: "OTP-UPI",
     autoRefresh: true,
-    autoBuy: true
+    autoBuy: true,
+    autoPayment: true,
+    paymentMethod: "ANY",
+    customPayment: ""
   };
 
   // If already loaded in this page context, clean up previous instance
@@ -395,6 +399,118 @@
     }
   }
 
+  function findPaymentRow(preference = "ANY", customKeyword = "") {
+    const bankList = document.querySelector(".bank-list");
+    if (!bankList) return null;
+
+    const itemContainers = bankList.querySelectorAll(".item.select");
+    const selectedSection = itemContainers[0] || null;
+    const anotherSection = itemContainers[1] || null;
+
+    let target = (preference || "ANY").trim().toLowerCase();
+    if (target === "custom" && customKeyword) {
+      target = customKeyword.trim().toLowerCase();
+    }
+    if (!target) target = "any";
+
+    function rowMatches(row) {
+      if (!row) return false;
+      if (
+        row.classList.contains("action") ||
+        row.classList.contains("disabled") ||
+        row.getAttribute("aria-disabled") === "true"
+      ) {
+        return false;
+      }
+      if (target === "any") return true;
+
+      const classes = (row.className || "").toLowerCase();
+      const text = (row.textContent || "").toLowerCase();
+
+      // Check specific bank aliases
+      if (target === "phonepe" && (classes.includes("phonepe") || text.includes("phonepe") || text.includes("@ybl") || text.includes("@ibl") || text.includes("@axl"))) return true;
+      if (target === "paytm" && (classes.includes("paytm") || text.includes("paytm") || text.includes("@paytm"))) return true;
+      if (target === "supermoney" && (classes.includes("supermoney") || text.includes("supermoney") || text.includes("super.money") || text.includes("@superyes"))) return true;
+      if (target === "navi" && (classes.includes("navi") || text.includes("navi") || text.includes("@naviaxis"))) return true;
+      if (target === "freecharge" && (classes.includes("freecharge") || text.includes("freecharge"))) return true;
+      if (target === "moneyview" && (classes.includes("moneyview") || text.includes("moneyview"))) return true;
+      if ((target === "gpay" || target === "googlepay") && (classes.includes("gpay") || text.includes("gpay") || text.includes("google") || text.includes("@okhdfcbank") || text.includes("@okaxis") || text.includes("@oksbi") || text.includes("@okicici"))) return true;
+      if (target === "bhim" && (classes.includes("bhim") || text.includes("bhim") || text.includes("@upi"))) return true;
+      if (target === "cred" && (classes.includes("cred") || text.includes("cred"))) return true;
+
+      return classes.includes(target) || text.includes(target);
+    }
+
+    // Step 1: First check on selected accounts
+    if (selectedSection) {
+      const selectedRows = [...selectedSection.querySelectorAll(".x-row")];
+      const match1 = selectedRows.find(rowMatches);
+      if (match1) {
+        return {
+          element: match1,
+          section: "Selected Account",
+          text: match1.innerText.replace(/\n+/g, " ").trim()
+        };
+      }
+    }
+
+    // Step 2: Then check in use another account
+    if (anotherSection) {
+      const anotherRows = [...anotherSection.querySelectorAll(".x-row")];
+      const match2 = anotherRows.find(rowMatches);
+      if (match2) {
+        return {
+          element: match2,
+          section: "Use Another Account",
+          text: match2.innerText.replace(/\n+/g, " ").trim()
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function autoSelectPaymentMethod(timeout = 6000) {
+    if (settings.autoPayment === false || isPaymentClicked) return Promise.resolve(false);
+
+    const preference = settings.paymentMethod || "ANY";
+    const customKeyword = settings.customPayment || "";
+    if (preference === "none") return Promise.resolve(false);
+
+    const start = Date.now();
+    return new Promise(resolve => {
+      const checkIntv = setInterval(() => {
+        if (isPaymentClicked) {
+          clearInterval(checkIntv);
+          return resolve(true);
+        }
+
+        const match = findPaymentRow(preference, customKeyword);
+        if (match && match.element) {
+          clearInterval(checkIntv);
+          isPaymentClicked = true;
+          log(`AUTO-PAY: Selected [${match.section}] "${match.text}" (target: ${preference}). Clicking...`);
+          realClick(match.element);
+          try {
+            api.runtime.sendMessage({
+              type: "PAYMENT_METHOD_CLICKED",
+              method: preference,
+              section: match.section,
+              text: match.text
+            });
+          } catch (e) {}
+          return resolve(true);
+        }
+
+        if (Date.now() - start >= timeout) {
+          clearInterval(checkIntv);
+          log(`AUTO-PAY: Timeout waiting for payment method "${preference}"`);
+          resolve(false);
+        }
+      }, 50);
+    });
+  }
+
   function handleOrderSuccess(orderId, amount) {
     if (isPurchased) return;
     isPurchased = true;
@@ -408,6 +524,11 @@
         order: orderId
       });
     } catch (e) {}
+
+    // Auto-select payment method on order success
+    if (settings.autoPayment !== false) {
+      autoSelectPaymentMethod();
+    }
   }
 
   function handleOrderFailure(orderId, reason) {
@@ -527,6 +648,7 @@
   function start(s) {
     stop();
     isPurchased = false;
+    isPaymentClicked = false;
     pendingOrder = null;
     failedOrders.clear();
     removeOldDebug();
@@ -547,13 +669,26 @@
     settings.max = maxVal;
     settings.tab = settings.tab || "OTP-UPI";
     settings.autoBuy = settings.autoBuy !== false;
+    settings.autoPayment = settings.autoPayment !== false;
+
+    // If already on payment screen at start, trigger payment method selection immediately
+    if (document.querySelector(".bank-list") && settings.autoPayment !== false) {
+      log("Already on Select Method Payment screen; auto-selecting payment method");
+      autoSelectPaymentMethod();
+      return;
+    }
 
     running = true;
-    log(`Started; tab=${settings.tab}; latency=${settings.latency}ms; autoBuy=${settings.autoBuy}`);
+    log(`Started; tab=${settings.tab}; latency=${settings.latency}ms; autoBuy=${settings.autoBuy}; autoPayment=${settings.autoPayment}`);
 
     // Watch DOM for when order is bought or screen switches away from buy list
     if (observer) observer.disconnect();
     observer = new MutationObserver(() => {
+      // Check if payment screen appeared
+      if (document.querySelector(".bank-list") && settings.autoPayment !== false && !isPaymentClicked) {
+        autoSelectPaymentMethod();
+      }
+
       if (!running || isPurchased) return;
 
       // Check if failure toast appeared
@@ -643,10 +778,19 @@
       ensureTargetTab();
       if (sendResponse) sendResponse({ ok: true });
       return Promise.resolve({ ok: true });
+    } else if (msg.type === "CLICK_PAYMENT_METHOD") {
+      isPaymentClicked = false;
+      if (msg.paymentMethod) settings.paymentMethod = msg.paymentMethod;
+      if (msg.customPayment) settings.customPayment = msg.customPayment;
+      settings.autoPayment = true;
+      autoSelectPaymentMethod();
+      if (sendResponse) sendResponse({ ok: true });
+      return Promise.resolve({ ok: true });
     } else if (msg.type === "GET_STATUS") {
       const res = {
         running,
-        tab: settings.tab || "OTP-UPI"
+        tab: settings.tab || "OTP-UPI",
+        paymentMethod: settings.paymentMethod || "ANY"
       };
       if (sendResponse) sendResponse(res);
       return Promise.resolve(res);
@@ -663,6 +807,19 @@
 
   window.addEventListener("hashchange", checkNavigation);
   window.addEventListener("popstate", checkNavigation);
+
+  // Load saved preferences on init
+  try {
+    const raw = localStorage.getItem("arb_preferences");
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p) {
+        if (p.autoPayment !== undefined) settings.autoPayment = p.autoPayment;
+        if (p.paymentMethod) settings.paymentMethod = p.paymentMethod;
+        if (p.customPayment) settings.customPayment = p.customPayment;
+      }
+    }
+  } catch(e) {}
 
   window.__arbBuyerMessageListener = messageHandler;
   api.runtime.onMessage.addListener(messageHandler);

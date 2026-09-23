@@ -373,6 +373,36 @@ input:checked + .slider:before{
   </div>
 </div>
 
+<div class="card">
+  <div class="toggle-row" style="margin-bottom:10px">
+    <div class="toggle-info">
+      <b>Auto Payment Method</b>
+      <small>Auto-selects payment method on success</small>
+    </div>
+    <label class="switch">
+      <input id="autoPayment" type="checkbox" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div id="paymentMethodWrap">
+    <label class="label">Preferred Method</label>
+    <select id="paymentMethod">
+      <option value="ANY">First Available Account</option>
+      <option value="phonepe">PhonePe</option>
+      <option value="paytm">Paytm</option>
+      <option value="supermoney">Supermoney</option>
+      <option value="navi">Navi</option>
+      <option value="freecharge">FreeCharge</option>
+      <option value="moneyview">MoneyView</option>
+      <option value="custom">Custom (UPI / Name)</option>
+    </select>
+    <div id="customPaymentBox" style="display:none; margin-top:8px">
+      <label class="label">Custom UPI / Keyword</label>
+      <input id="customPayment" type="text" placeholder="e.g. ajay.shakya20@ybl or @superyes">
+    </div>
+  </div>
+</div>
+
 <button id="toggleBtn" class="btn-toggle btn-start">
   ▶ Start Buying
 </button>
