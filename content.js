@@ -2,8 +2,6 @@
   const api = typeof browser !== "undefined" ? browser : chrome;
   let timer = null;
   let scanTimer = null;
-  let watchdogTimer = null;
-  let lastOrderTime = Date.now();
   let running = false;
   let isPurchased = false;
   let isPaymentClicked = false;
@@ -245,63 +243,6 @@
     }
   }
 
-  function hasAvailableMatchingOrders() {
-    if (!isIndividualMode()) return false;
-    const cards = document.querySelectorAll(".item[platformorder], [platformorder]");
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const po = card.getAttribute("platformorder");
-      if (po && failedOrders.has(po)) continue;
-
-      const amount = parseAmount(card);
-      if (!matches(amount)) continue;
-
-      const orderId = po || getOrderId(card, amount);
-      if (failedOrders.has(orderId)) continue;
-
-      return true;
-    }
-    return false;
-  }
-
-  // 4-5 second idle watchdog: if no order comes for 4-5 seconds, automatically refresh via filter option
-  function checkOrderWatchdog() {
-    if (!running || isPurchased || isRefreshing) return;
-    if (!isOrderBookPage()) return;
-    if (settings.autoRefresh === false) return;
-
-    // Safety clear stale pendingOrder if stuck > 4s
-    if (pendingOrder && pendingOrder.timestamp && (Date.now() - pendingOrder.timestamp > 4000)) {
-      log("Watchdog: clearing stale pendingOrder");
-      pendingOrder = null;
-    }
-    if (pendingOrder) return;
-
-    // If currently on range page instead of individual mode, switch
-    if (!isIndividualMode()) {
-      const now = Date.now();
-      if (now - lastOrderTime >= 1000) {
-        log("Not in individual mode; switching via filter option");
-        lastOrderTime = now;
-        clickFilterOption();
-      }
-      return;
-    }
-
-    const now = Date.now();
-    if (hasAvailableMatchingOrders()) {
-      lastOrderTime = now;
-      return;
-    }
-
-    // No available matching orders in DOM
-    const elapsed = now - lastOrderTime;
-    if (elapsed >= 4000) {
-      log(`No available orders for ${(elapsed / 1000).toFixed(1)}s; refreshing via filter option`);
-      lastOrderTime = now;
-      refreshOrders();
-    }
-  }
 
   function findBuyButton(card) {
     if (!card) return null;
@@ -603,9 +544,6 @@
     // Apply native CSS rules - 0ms CPU overhead, persistent across Vue re-renders
     updateFailedStyles();
 
-    // Reset lastOrderTime so watchdog gives time for the new refresh
-    lastOrderTime = Date.now();
-
     // Fast refresh to fetch latest orders
     setTimeout(() => {
       if (running && !isPurchased) {
@@ -701,10 +639,6 @@
         return;
       }
     }
-
-    if (hasAvailable) {
-      lastOrderTime = Date.now();
-    }
   }
 
   let observer = null;
@@ -717,8 +651,7 @@
     isRefreshing = false;
     if (timer) clearInterval(timer);
     if (scanTimer) clearInterval(scanTimer);
-    if (watchdogTimer) clearInterval(watchdogTimer);
-    timer = scanTimer = watchdogTimer = null;
+    timer = scanTimer = null;
     if (observer) {
       observer.disconnect();
       observer = null;
@@ -816,12 +749,19 @@
       }
     })();
 
-    lastOrderTime = Date.now();
     isRefreshing = false;
 
-    // 4-5 second idle watchdog: if no order comes for 4-5 seconds, automatically refresh via filter option
+    // Auto-refresh: clicks filter option continuously at the user's configured latency (rate)
     if (settings.autoRefresh) {
-      watchdogTimer = setInterval(checkOrderWatchdog, 500);
+      const refreshInterval = Math.max(200, settings.latency);
+      timer = setInterval(() => {
+        if (!running || isPurchased || pendingOrder) return;
+        refreshOrders();
+
+        setTimeout(() => {
+          if (running && !isPurchased && !pendingOrder) scanOrders();
+        }, 120);
+      }, refreshInterval);
     }
 
     // High frequency order scanner to instantly catch orders when DOM updates
