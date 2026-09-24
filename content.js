@@ -117,17 +117,6 @@
            null;
   }
 
-  // Single click on the filter toggle button (avoids double-firing)
-  function clickFilterButton() {
-    const filterBtn = findFilterButton();
-    if (!filterBtn) {
-      log("Filter button (switch-btn) not found");
-      return false;
-    }
-    filterBtn.click();
-    return true;
-  }
-
   // Verify if individual orders list is active (NOT the range page)
   function isIndividualMode() {
     return Boolean(
@@ -135,6 +124,51 @@
       document.querySelector(".item[platformorder]") ||
       document.querySelector("[platformorder]")
     );
+  }
+
+  // Detect if page is in range mode (e.g. ₹100-200, no platformorder, or no .x-buyList-filter)
+  function isRangeMode() {
+    if (isIndividualMode()) return false;
+    const items = document.querySelectorAll(".item");
+    if (items.length > 0 && !items[0].hasAttribute("platformorder")) return true;
+    if (document.querySelector(".range-paytag1, .range-paytag2, .range-paytag3")) return true;
+    if (document.querySelector(".switch-btn") && !document.querySelector(".x-buyList-filter")) return true;
+    return false;
+  }
+
+  let isSwitchingMode = false;
+  let lastSwitchTime = 0;
+
+  // Dedicated function to switch from Range Mode to Individual Mode ONCE with cooldown
+  async function switchToIndividualMode() {
+    if (isIndividualMode()) return true;
+    const now = Date.now();
+    // Cooldown: at least 1200ms between any switch-btn clicks to completely prevent toggling/bouncing
+    if (isSwitchingMode || (now - lastSwitchTime < 1200)) return false;
+
+    const switchBtn = findFilterButton();
+    if (!switchBtn) {
+      log("Switch button (switch-btn) not found");
+      return false;
+    }
+
+    isSwitchingMode = true;
+    lastSwitchTime = now;
+    log("Range mode detected; switching to individual orders mode via switch-btn");
+
+    realClick(switchBtn);
+
+    // Wait up to 600ms for Vue to render individual mode (.x-buyList-filter)
+    for (let i = 0; i < 12; i++) {
+      await new Promise(r => setTimeout(r, 50));
+      if (isIndividualMode()) {
+        log("Successfully transitioned to individual orders mode");
+        break;
+      }
+    }
+
+    isSwitchingMode = false;
+    return isIndividualMode();
   }
 
   // Dynamic order book detector: works across any domain and route without relying on URLs
@@ -173,57 +207,45 @@
     return null;
   }
 
-  // Click filter option (Default) or switch-btn to refresh individual orders
+  // Click filter option (Default) in .x-buyList-filter to refresh individual orders
+  // Strictly operates on the individual orders page; NEVER clicks switch-btn as fallback
   async function clickFilterOption() {
     if (!isOrderBookPage()) return false;
 
-    // 1. If currently in range mode, switch to individual mode first
-    if (!isIndividualMode()) {
-      const switchBtn = findFilterButton();
-      if (switchBtn) {
-        log("Switching to individual orders mode via switch-btn");
-        realClick(switchBtn);
+    // If currently in range mode, switch to individual mode once and return
+    if (isRangeMode()) {
+      await switchToIndividualMode();
+      return false;
+    }
+
+    // Locate the filter option button ("Default ▾") in .x-buyList-filter
+    const filterBtn = document.querySelector(".x-buyList-filter button.amount, .x-buyList-filter .van-popover__wrapper, .x-buyList-filter button");
+    if (!filterBtn) {
+      return false;
+    }
+
+    // Check if popover is already open
+    let popover = document.querySelector(".van-popover");
+    const isAlreadyOpen = popover && window.getComputedStyle(popover).display !== "none";
+    if (!isAlreadyOpen) {
+      realClick(filterBtn);
+      // Wait briefly for popover to render
+      for (let i = 0; i < 6; i++) {
+        await new Promise(r => setTimeout(r, 40));
+        popover = document.querySelector(".van-popover");
+        if (popover && window.getComputedStyle(popover).display !== "none") break;
+      }
+    }
+
+    if (popover && window.getComputedStyle(popover).display !== "none") {
+      const actions = Array.from(popover.querySelectorAll(".van-popover__action, .van-popover__action-text, [role='menuitem'], [role='button'], div, span"));
+      const defaultAction = actions.find(el => (el.textContent || "").trim() === "Default") ||
+                            actions.find(el => (el.textContent || "").trim() === "Large") ||
+                            actions[0];
+      if (defaultAction) {
+        realClick(defaultAction);
         return true;
       }
-    }
-
-    // 2. Click the filter option button (Default) in .x-buyList-filter
-    const filterBtn = document.querySelector(".x-buyList-filter button.amount, .x-buyList-filter .van-popover__wrapper, .x-buyList-filter button");
-    if (filterBtn) {
-      log("Refreshing orders via filter option button");
-
-      // Check if popover is already open
-      let popover = document.querySelector(".van-popover");
-      const isAlreadyOpen = popover && window.getComputedStyle(popover).display !== "none";
-      if (!isAlreadyOpen) {
-        realClick(filterBtn);
-        // Wait briefly for popover to render
-        for (let i = 0; i < 6; i++) {
-          await new Promise(r => setTimeout(r, 40));
-          popover = document.querySelector(".van-popover");
-          if (popover && window.getComputedStyle(popover).display !== "none") break;
-        }
-      }
-
-      if (popover && window.getComputedStyle(popover).display !== "none") {
-        const actions = Array.from(popover.querySelectorAll(".van-popover__action, .van-popover__action-text, [role='menuitem'], [role='button'], div, span"));
-        const defaultAction = actions.find(el => (el.textContent || "").trim() === "Default") ||
-                              actions.find(el => (el.textContent || "").trim() === "Large") ||
-                              actions[0];
-        if (defaultAction) {
-          realClick(defaultAction);
-          return true;
-        }
-      }
-      return true;
-    }
-
-    // 3. Fallback: switch-btn
-    const switchBtn = findFilterButton();
-    if (switchBtn) {
-      log("Refreshing orders via switch-btn fallback");
-      realClick(switchBtn);
-      return true;
     }
 
     return false;
@@ -234,21 +256,26 @@
 
   // Refresh orders by clicking the filter option - never blocked by empty order book!
   async function refreshOrders() {
-    if (!running || isPurchased || pendingOrder) return;
+    if (!running || isPurchased || pendingOrder || isSwitchingMode) return;
     if (!isOrderBookPage()) return;
 
-    // Safety timeout: if isRefreshing was true for more than 3 seconds, force-reset it so it never hangs!
+    // Safety timeout: if isRefreshing was true for more than 2 seconds, force-reset it so it never hangs!
     const now = Date.now();
-    if (isRefreshing && (now - refreshLockTime < 3000)) return;
+    if (isRefreshing && (now - refreshLockTime < 2000)) return;
 
     // Don't refresh if page is currently busy with loading spinner
     if (document.querySelector(".van-loading, .van-toast--loading")) return;
+
+    // If currently in range mode, switch to individual mode once and exit
+    if (isRangeMode()) {
+      await switchToIndividualMode();
+      return;
+    }
 
     isRefreshing = true;
     refreshLockTime = now;
     try {
       await clickFilterOption();
-      await new Promise(r => setTimeout(r, 200));
       if (running && !isPurchased && !pendingOrder) {
         scanOrders();
       }
@@ -663,6 +690,7 @@
     isPaymentClicked = false;
     pendingOrder = null;
     isRefreshing = false;
+    isSwitchingMode = false;
     if (timer) clearInterval(timer);
     if (scanTimer) clearInterval(scanTimer);
     timer = scanTimer = null;
@@ -745,38 +773,40 @@
     // If needed, switch tab ONCE at start (never continuously in refresh loop!)
     const switchedTab = ensureTargetTab();
 
-    // Ensure we are in individual mode on start
+    // Sequence startup: switch tab -> switch to individual mode -> start loops
     (async () => {
       if (switchedTab) {
-        await new Promise(r => setTimeout(r, 200));
+        log(`Switched to target tab ${settings.tab}, waiting for tab DOM...`);
+        await new Promise(r => setTimeout(r, 250));
       }
       if (!running || isPurchased) return;
 
       if (!isIndividualMode()) {
-        log("Switching to individual orders mode on start");
-        await clickFilterOption();
-        await new Promise(r => setTimeout(r, 200));
+        log("Not in individual mode at startup; switching now...");
+        await switchToIndividualMode();
+        await new Promise(r => setTimeout(r, 150));
       }
 
-      if (running && !isPurchased) {
-        scanOrders();
+      if (!running || isPurchased) return;
+
+      log("Individual orders mode established; starting scan & refresh loops");
+
+      // Initial scan
+      scanOrders();
+
+      // Start auto-refresh interval strictly AFTER individual mode is established
+      if (settings.autoRefresh && !timer) {
+        const refreshInterval = Math.max(200, settings.latency);
+        timer = setInterval(() => {
+          if (!running || isPurchased || pendingOrder) return;
+          refreshOrders();
+
+          setTimeout(() => {
+            if (running && !isPurchased && !pendingOrder) scanOrders();
+          }, 120);
+        }, refreshInterval);
       }
     })();
-
-    isRefreshing = false;
-
-    // Auto-refresh: clicks filter option continuously at the user's configured latency (rate)
-    if (settings.autoRefresh) {
-      const refreshInterval = Math.max(200, settings.latency);
-      timer = setInterval(() => {
-        if (!running || isPurchased || pendingOrder) return;
-        refreshOrders();
-
-        setTimeout(() => {
-          if (running && !isPurchased && !pendingOrder) scanOrders();
-        }, 120);
-      }, refreshInterval);
-    }
 
     // High frequency order scanner to instantly catch orders when DOM updates
     scanTimer = setInterval(() => {
