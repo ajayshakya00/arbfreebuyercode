@@ -2,6 +2,8 @@
   const api = typeof browser !== "undefined" ? browser : chrome;
   let timer = null;
   let scanTimer = null;
+  let watchdogTimer = null;
+  let lastOrderTime = Date.now();
   let running = false;
   let isPurchased = false;
   let isPaymentClicked = false;
@@ -161,86 +163,143 @@
     );
   }
 
-  // Checks if orders (either range or individual) have loaded in the DOM
-  function areOrdersLoaded() {
-    const items = document.querySelectorAll(".item");
-    if (items.length === 0) return false;
-    const hasLoading = Boolean(
-      document.querySelector(".van-loading") ||
-      document.querySelector(".van-toast--loading") ||
-      document.querySelector('[class*="loadingLottie"]')
-    );
-    return !hasLoading;
-  }
+  // Click filter option (e.g. Default / Large popover) or switch-btn to refresh individual orders
+  async function clickFilterOption() {
+    if (!isOrderBookPage()) return false;
 
-  // Checks if individual orders (with platformorder) are loaded
-  function areIndividualOrdersLoaded() {
-    return isIndividualMode() && document.querySelectorAll(".item[platformorder]").length > 0;
-  }
+    // 1. If currently in range mode, switch to individual mode first
+    if (!isIndividualMode()) {
+      const switchBtn = findFilterButton();
+      if (switchBtn) {
+        log("Switching to individual orders mode via switch-btn");
+        realClick(switchBtn);
+        return true;
+      }
+    }
 
-  // Waits until orders are loaded in DOM before applying filter
-  function waitForOrdersLoaded(timeout = 4000) {
-    return new Promise(resolve => {
-      if (areOrdersLoaded()) return resolve(true);
-      const start = Date.now();
-      const intv = setInterval(() => {
-        if (!running || isPurchased) {
-          clearInterval(intv);
-          return resolve(false);
-        }
-        if (areOrdersLoaded()) {
-          clearInterval(intv);
-          return resolve(true);
-        }
-        if (Date.now() - start >= timeout) {
-          clearInterval(intv);
-          resolve(areOrdersLoaded());
-        }
-      }, 50);
-    });
-  }
+    // 2. Click the filter option button (e.g. Default / Large) in .x-buyList-filter
+    const filterBtn = document.querySelector(".x-buyList-filter button.amount, .x-buyList-filter button, .x-buyList-filter .btn");
+    if (filterBtn) {
+      log("Refreshing orders via filter option button");
+      realClick(filterBtn);
 
-  // Waits until individual order items are loaded in DOM
-  function waitForIndividualOrdersLoaded(timeout = 3000) {
-    return new Promise(resolve => {
-      if (areIndividualOrdersLoaded()) return resolve(true);
-      const start = Date.now();
-      const intv = setInterval(() => {
-        if (!running || isPurchased) {
-          clearInterval(intv);
-          return resolve(false);
+      // Wait briefly for popover to render
+      let popover = null;
+      for (let i = 0; i < 6; i++) {
+        await new Promise(r => setTimeout(r, 50));
+        popover = document.querySelector(".van-popover");
+        if (popover && window.getComputedStyle(popover).display !== "none") break;
+      }
+
+      if (popover) {
+        const actions = Array.from(popover.querySelectorAll(".van-popover__action, .van-popover__action-text, [role='button'], div, span"));
+        const defaultAction = actions.find(el => (el.textContent || "").trim() === "Default") ||
+                              actions.find(el => (el.textContent || "").trim() === "Large") ||
+                              actions[0];
+        if (defaultAction) {
+          realClick(defaultAction);
+          return true;
         }
-        if (areIndividualOrdersLoaded()) {
-          clearInterval(intv);
-          return resolve(true);
-        }
-        if (Date.now() - start >= timeout) {
-          clearInterval(intv);
-          resolve(areIndividualOrdersLoaded());
-        }
-      }, 50);
-    });
+      }
+      return true;
+    }
+
+    // 3. Fallback: switch-btn
+    const switchBtn = findFilterButton();
+    if (switchBtn) {
+      log("Refreshing orders via switch-btn fallback");
+      realClick(switchBtn);
+      return true;
+    }
+
+    return false;
   }
 
   let isRefreshing = false;
+  let refreshLockTime = 0;
 
-  // Refresh orders by clicking the filter icon - only when order is loaded!
+  // Refresh orders by clicking the filter option - never blocked by empty order book!
   async function refreshOrders() {
-    if (!running || isPurchased || isRefreshing || pendingOrder) return;
+    if (!running || isPurchased || pendingOrder) return;
     if (!isOrderBookPage()) return;
 
-    // Apply filter only when the order is loaded
-    if (!areOrdersLoaded()) return;
+    // Safety timeout: if isRefreshing was true for more than 3 seconds, force-reset it so it never hangs!
+    const now = Date.now();
+    if (isRefreshing && (now - refreshLockTime < 3000)) return;
+
+    // Don't refresh if page is currently busy with loading spinner
+    if (document.querySelector(".van-loading, .van-toast--loading")) return;
 
     isRefreshing = true;
-    clickFilterButton();
+    refreshLockTime = now;
+    try {
+      await clickFilterOption();
+      await new Promise(r => setTimeout(r, 200));
+      if (running && !isPurchased && !pendingOrder) {
+        scanOrders();
+      }
+    } catch (e) {
+      log("Error during refresh:", e);
+    } finally {
+      isRefreshing = false;
+    }
+  }
 
-    // Wait until new orders are loaded after clicking filter
-    await waitForOrdersLoaded(2000);
-    isRefreshing = false;
+  function hasAvailableMatchingOrders() {
+    if (!isIndividualMode()) return false;
+    const cards = document.querySelectorAll(".item[platformorder], [platformorder]");
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const po = card.getAttribute("platformorder");
+      if (po && failedOrders.has(po)) continue;
 
-    if (running && !isPurchased) {
-      scanOrders();
+      const amount = parseAmount(card);
+      if (!matches(amount)) continue;
+
+      const orderId = po || getOrderId(card, amount);
+      if (failedOrders.has(orderId)) continue;
+
+      return true;
+    }
+    return false;
+  }
+
+  // 4-5 second idle watchdog: if no order comes for 4-5 seconds, automatically refresh via filter option
+  function checkOrderWatchdog() {
+    if (!running || isPurchased || isRefreshing) return;
+    if (!isOrderBookPage()) return;
+    if (settings.autoRefresh === false) return;
+
+    // Safety clear stale pendingOrder if stuck > 4s
+    if (pendingOrder && pendingOrder.timestamp && (Date.now() - pendingOrder.timestamp > 4000)) {
+      log("Watchdog: clearing stale pendingOrder");
+      pendingOrder = null;
+    }
+    if (pendingOrder) return;
+
+    // If currently on range page instead of individual mode, switch
+    if (!isIndividualMode()) {
+      const now = Date.now();
+      if (now - lastOrderTime >= 1000) {
+        log("Not in individual mode; switching via filter option");
+        lastOrderTime = now;
+        clickFilterOption();
+      }
+      return;
+    }
+
+    const now = Date.now();
+    if (hasAvailableMatchingOrders()) {
+      lastOrderTime = now;
+      return;
+    }
+
+    // No available matching orders in DOM
+    const elapsed = now - lastOrderTime;
+    if (elapsed >= 4000) {
+      log(`No available orders for ${(elapsed / 1000).toFixed(1)}s; refreshing via filter option`);
+      lastOrderTime = now;
+      refreshOrders();
     }
   }
 
@@ -544,6 +603,9 @@
     // Apply native CSS rules - 0ms CPU overhead, persistent across Vue re-renders
     updateFailedStyles();
 
+    // Reset lastOrderTime so watchdog gives time for the new refresh
+    lastOrderTime = Date.now();
+
     // Fast refresh to fetch latest orders
     setTimeout(() => {
       if (running && !isPurchased) {
@@ -599,6 +661,7 @@
     const len = cards.length;
     if (len === 0) return;
 
+    let hasAvailable = false;
     for (let i = 0; i < len; i++) {
       const card = cards[i];
       const po = card.getAttribute("platformorder");
@@ -609,6 +672,8 @@
 
       const orderId = po || getOrderId(card, amount);
       if (failedOrders.has(orderId)) continue;
+
+      hasAvailable = true;
 
       if (settings.autoBuy) {
         const btn = findBuyButton(card);
@@ -636,6 +701,10 @@
         return;
       }
     }
+
+    if (hasAvailable) {
+      lastOrderTime = Date.now();
+    }
   }
 
   let observer = null;
@@ -648,7 +717,8 @@
     isRefreshing = false;
     if (timer) clearInterval(timer);
     if (scanTimer) clearInterval(scanTimer);
-    timer = scanTimer = null;
+    if (watchdogTimer) clearInterval(watchdogTimer);
+    timer = scanTimer = watchdogTimer = null;
     if (observer) {
       observer.disconnect();
       observer = null;
@@ -728,19 +798,17 @@
     // If needed, switch tab ONCE at start (never continuously in refresh loop!)
     const switchedTab = ensureTargetTab();
 
-    // Apply select filter only when the order is loaded
+    // Ensure we are in individual mode on start
     (async () => {
       if (switchedTab) {
         await new Promise(r => setTimeout(r, 200));
       }
-      // Wait until orders are loaded in DOM before applying filter
-      await waitForOrdersLoaded();
       if (!running || isPurchased) return;
 
       if (!isIndividualMode()) {
-        log("Order loaded; applying filter to switch to individual orders");
-        clickFilterButton();
-        await waitForIndividualOrdersLoaded();
+        log("Switching to individual orders mode on start");
+        await clickFilterOption();
+        await new Promise(r => setTimeout(r, 200));
       }
 
       if (running && !isPurchased) {
@@ -748,17 +816,12 @@
       }
     })();
 
-    // Auto-refresh: clicks filter icon repeatedly to refresh individual orders (never clicks OTP-UPI tab)
-    if (settings.autoRefresh) {
-      const refreshInterval = Math.max(200, settings.latency);
-      timer = setInterval(() => {
-        if (!running) return;
-        refreshOrders();
+    lastOrderTime = Date.now();
+    isRefreshing = false;
 
-        setTimeout(() => {
-          if (running) scanOrders();
-        }, 150);
-      }, refreshInterval);
+    // 4-5 second idle watchdog: if no order comes for 4-5 seconds, automatically refresh via filter option
+    if (settings.autoRefresh) {
+      watchdogTimer = setInterval(checkOrderWatchdog, 500);
     }
 
     // High frequency order scanner to instantly catch orders when DOM updates
