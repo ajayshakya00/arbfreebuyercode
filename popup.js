@@ -310,8 +310,13 @@ $("sourceLink").onclick = (e) => {
     const tab = await getActiveTab();
     if (tab && tab.id && tab.url && /^https?:\/\//i.test(tab.url)) {
       const res = await sendTabMessage(tab.id, { type: "GET_STATUS" });
-      if (res && typeof res.running === "boolean") {
-        updateUiState(res.running, res.tab);
+      if (res) {
+        if (typeof res.running === "boolean") {
+          updateUiState(res.running, res.tab);
+        }
+        if (!res.running && res.activeOnPage && !s.tab) {
+          $("tabSelect").value = res.activeOnPage;
+        }
       }
     }
   } catch (e) {}

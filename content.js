@@ -73,14 +73,14 @@
 
     try { el.scrollIntoView({block: "nearest", inline: "nearest"}); } catch(e) {}
     try { el.focus(); } catch(e) {}
-    try { el.click(); } catch(e) {}
 
     const opts = {bubbles: true, cancelable: true, view: window, buttons: 1, button: 0};
-    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
       try {
         el.dispatchEvent(new MouseEvent(type, opts));
       } catch(e) {}
     }
+    try { el.click(); } catch(e) {}
 
     return true;
   }
@@ -161,7 +161,19 @@
     );
   }
 
-  // Click filter option (e.g. Default / Large popover) or switch-btn to refresh individual orders
+  function getCurrentActiveTabName() {
+    const activeTab = document.querySelector('[role="tab"][aria-selected="true"], .van-tab--active, .van-tab.van-tab--line.van-tab--active');
+    if (!activeTab) return null;
+    const txt = (activeTab.textContent || "").trim().toUpperCase();
+    if (txt.includes("OTP")) return "OTP-UPI";
+    if (txt.startsWith("UPI")) return "UPI";
+    if (txt.includes("BANK")) return "BANK";
+    if (txt.includes("QUICK")) return "Quick";
+    if (txt.includes("USDT")) return "USDT";
+    return null;
+  }
+
+  // Click filter option (Default) or switch-btn to refresh individual orders
   async function clickFilterOption() {
     if (!isOrderBookPage()) return false;
 
@@ -175,22 +187,26 @@
       }
     }
 
-    // 2. Click the filter option button (e.g. Default / Large) in .x-buyList-filter
-    const filterBtn = document.querySelector(".x-buyList-filter button.amount, .x-buyList-filter button, .x-buyList-filter .btn");
+    // 2. Click the filter option button (Default) in .x-buyList-filter
+    const filterBtn = document.querySelector(".x-buyList-filter button.amount, .x-buyList-filter .van-popover__wrapper, .x-buyList-filter button");
     if (filterBtn) {
       log("Refreshing orders via filter option button");
-      realClick(filterBtn);
 
-      // Wait briefly for popover to render
-      let popover = null;
-      for (let i = 0; i < 6; i++) {
-        await new Promise(r => setTimeout(r, 50));
-        popover = document.querySelector(".van-popover");
-        if (popover && window.getComputedStyle(popover).display !== "none") break;
+      // Check if popover is already open
+      let popover = document.querySelector(".van-popover");
+      const isAlreadyOpen = popover && window.getComputedStyle(popover).display !== "none";
+      if (!isAlreadyOpen) {
+        realClick(filterBtn);
+        // Wait briefly for popover to render
+        for (let i = 0; i < 6; i++) {
+          await new Promise(r => setTimeout(r, 40));
+          popover = document.querySelector(".van-popover");
+          if (popover && window.getComputedStyle(popover).display !== "none") break;
+        }
       }
 
-      if (popover) {
-        const actions = Array.from(popover.querySelectorAll(".van-popover__action, .van-popover__action-text, [role='button'], div, span"));
+      if (popover && window.getComputedStyle(popover).display !== "none") {
+        const actions = Array.from(popover.querySelectorAll(".van-popover__action, .van-popover__action-text, [role='menuitem'], [role='button'], div, span"));
         const defaultAction = actions.find(el => (el.textContent || "").trim() === "Default") ||
                               actions.find(el => (el.textContent || "").trim() === "Large") ||
                               actions[0];
@@ -632,8 +648,6 @@
         log(`AUTO-BUY: Sniping order ₹${amount} (${orderId})!`);
 
         realClick(btn);
-        const child = btn.querySelector(".van-button__text, .van-button__content");
-        if (child) realClick(child);
 
         waitForBuyOutcome(pendingOrder);
         return;
@@ -805,9 +819,11 @@
       if (sendResponse) sendResponse({ ok: true });
       return Promise.resolve({ ok: true });
     } else if (msg.type === "GET_STATUS") {
+      const activeOnPage = getCurrentActiveTabName();
       const res = {
         running,
-        tab: settings.tab || "OTP-UPI",
+        tab: settings.tab || activeOnPage || "OTP-UPI",
+        activeOnPage,
         paymentMethod: settings.paymentMethod || "ANY"
       };
       if (sendResponse) sendResponse(res);
