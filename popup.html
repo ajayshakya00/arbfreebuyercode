@@ -403,6 +403,32 @@ input:checked + .slider:before{
   </div>
 </div>
 
+<div class="card">
+  <div class="toggle-row" style="margin-bottom:10px">
+    <div class="toggle-info">
+      <b>Sound Alarm on Success</b>
+      <small>Plays loud audio alert when order is bought</small>
+    </div>
+    <label class="switch">
+      <input id="soundAlarm" type="checkbox" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <button id="testAlarmBtn" type="button" class="btn-source" style="flex:1; padding:7px 10px; font-size:11px;">
+      🔔 Test Alarm
+    </button>
+    <label for="customAudioInput" class="btn-source" style="flex:1; padding:7px 10px; font-size:11px; cursor:pointer; text-align:center;">
+      📁 Attach Audio
+      <input id="customAudioInput" type="file" accept="audio/*" style="display:none">
+    </label>
+  </div>
+  <div id="customAudioInfo" style="display:none; margin-top:8px; padding:6px 10px; background:#0b130f; border-radius:6px; border:1px solid #1a2c22; font-size:11px; color:#799a88; align-items:center; justify-content:space-between;">
+    <span id="customAudioName" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px;"></span>
+    <button id="removeCustomAudio" type="button" title="Remove custom audio" style="background:transparent; border:0; color:#e53935; cursor:pointer; font-weight:700; font-size:13px; margin-left:6px; line-height:1;">✕</button>
+  </div>
+</div>
+
 <button id="toggleBtn" class="btn-toggle btn-start">
   ▶ Start Buying
 </button>

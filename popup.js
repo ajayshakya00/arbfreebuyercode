@@ -3,6 +3,9 @@ const api = typeof browser !== "undefined" ? browser : chrome;
 const $ = id => document.getElementById(id);
 let mode = "range";
 let isRunning = false;
+let customAudioData = null;
+let customAudioFileName = "";
+let testAudio = null;
 
 function clampSettings(updateUi = true) {
   let rawLatency = Number($("latency").value);
@@ -50,6 +53,9 @@ function savePreferences(updateUi = false) {
     refresh: $("refresh").checked,
     autoBuy: $("autoBuy").checked,
     autoPayment: $("autoPayment").checked,
+    soundAlarm: $("soundAlarm").checked,
+    customAudioData: customAudioData || null,
+    customAudioFileName: customAudioFileName || "",
     paymentMethod: $("paymentMethod").value,
     customPayment: $("customPayment").value
   };
@@ -82,7 +88,11 @@ async function loadPreferences() {
 
   if (!prefs && api && api.storage && api.storage.local) {
     try {
-      const extStored = await api.storage.local.get(["mode", "min", "max", "fixed", "latency", "refresh", "autoBuy", "autoPayment", "paymentMethod", "customPayment", "tab"]);
+      const extStored = await api.storage.local.get([
+        "mode", "min", "max", "fixed", "latency", "refresh", "autoBuy",
+        "autoPayment", "soundAlarm", "customAudioData", "customAudioFileName",
+        "paymentMethod", "customPayment", "tab"
+      ]);
       if (extStored && Object.keys(extStored).length > 0) {
         prefs = extStored;
       }
@@ -229,6 +239,8 @@ async function handleToggle() {
         autoRefresh: $("refresh").checked,
         autoBuy: $("autoBuy").checked,
         autoPayment: $("autoPayment").checked,
+        soundAlarm: $("soundAlarm").checked,
+        customAudioData: customAudioData || null,
         paymentMethod: $("paymentMethod").value,
         customPayment: $("customPayment").value
       });
@@ -251,6 +263,84 @@ function updatePaymentUi() {
   $("customPaymentBox").style.display = (isAutoPay && method === "custom") ? "" : "none";
 }
 
+function updateAudioUi() {
+  if (customAudioFileName) {
+    $("customAudioInfo").style.display = "flex";
+    $("customAudioName").textContent = `🎵 ${customAudioFileName}`;
+  } else {
+    $("customAudioInfo").style.display = "none";
+    $("customAudioName").textContent = "";
+  }
+}
+
+// Test Alarm Button Handler
+$("testAlarmBtn").onclick = () => {
+  if (testAudio) {
+    try { testAudio.pause(); } catch(e) {}
+    testAudio = null;
+    $("testAlarmBtn").textContent = "🔔 Test Alarm";
+    return;
+  }
+
+  const audioSrc = customAudioData || (api && api.runtime ? api.runtime.getURL("alarm.mp3") : "alarm.mp3");
+  testAudio = new Audio(audioSrc);
+  testAudio.play().then(() => {
+    $("testAlarmBtn").textContent = "⏹ Stop Test";
+  }).catch(() => {
+    playSynthBeep();
+    $("testAlarmBtn").textContent = "🔔 Beeped!";
+    setTimeout(() => { $("testAlarmBtn").textContent = "🔔 Test Alarm"; }, 1500);
+  });
+  testAudio.onended = () => {
+    testAudio = null;
+    $("testAlarmBtn").textContent = "🔔 Test Alarm";
+  };
+};
+
+function playSynthBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1174, 1396, 1760].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + idx * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.12);
+      osc.stop(ctx.currentTime + idx * 0.12 + 0.22);
+    });
+  } catch (e) {}
+}
+
+// Attach Custom Audio Handler
+$("customAudioInput").onchange = (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    alert("Audio file too large. Max size is 8MB.");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    customAudioData = ev.target.result;
+    customAudioFileName = file.name;
+    updateAudioUi();
+    savePreferences(true);
+  };
+  reader.readAsDataURL(file);
+};
+
+$("removeCustomAudio").onclick = () => {
+  customAudioData = null;
+  customAudioFileName = "";
+  $("customAudioInput").value = "";
+  updateAudioUi();
+  savePreferences(true);
+};
+
 $("autoPayment").addEventListener("change", () => {
   updatePaymentUi();
   savePreferences(true);
@@ -272,13 +362,12 @@ $("sourceLink").onclick = (e) => {
 };
 
 // Bind change, input, and blur listeners to auto-save preferences
-// On input: save without re-formatting inputs to preserve smooth cursor typing
 ["min", "max", "fixed", "latency"].forEach(id => {
   $(id).addEventListener("input", () => savePreferences(false));
   $(id).addEventListener("change", () => savePreferences(true));
   $(id).addEventListener("blur", () => savePreferences(true));
 });
-["tabSelect", "refresh", "autoBuy"].forEach(id => {
+["tabSelect", "refresh", "autoBuy", "soundAlarm"].forEach(id => {
   $(id).addEventListener("change", () => savePreferences(true));
 });
 
@@ -293,12 +382,16 @@ $("sourceLink").onclick = (e) => {
   $("refresh").checked = s.refresh !== false;
   $("autoBuy").checked = s.autoBuy !== false;
   $("autoPayment").checked = s.autoPayment !== false;
+  $("soundAlarm").checked = s.soundAlarm !== false;
+  customAudioData = s.customAudioData || null;
+  customAudioFileName = s.customAudioFileName || "";
   $("paymentMethod").value = s.paymentMethod || "ANY";
   $("customPayment").value = s.customPayment || "";
   if (s.tab) $("tabSelect").value = s.tab;
 
   clampSettings(true);
   updatePaymentUi();
+  updateAudioUi();
 
   if (mode === "fixed") {
     $("fixedBtn").click();

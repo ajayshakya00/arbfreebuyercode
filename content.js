@@ -17,6 +17,8 @@
     autoRefresh: true,
     autoBuy: true,
     autoPayment: true,
+    soundAlarm: true,
+    customAudioData: null,
     paymentMethod: "ANY",
     customPayment: ""
   };
@@ -292,6 +294,22 @@
     return card.querySelector("button, .btn, .x-btn, .van-button");
   }
 
+  // Ultra-fast buy button click with ZERO layout reflow and ZERO focus delay (sub-millisecond)
+  function fastSnipeClick(btn) {
+    if (!btn || btn.disabled) return false;
+    try {
+      const opts = { bubbles: true, cancelable: true, view: window, buttons: 1, button: 0 };
+      btn.dispatchEvent(new PointerEvent("pointerdown", opts));
+      btn.dispatchEvent(new MouseEvent("mousedown", opts));
+      btn.dispatchEvent(new PointerEvent("pointerup", opts));
+      btn.dispatchEvent(new MouseEvent("mouseup", opts));
+    } catch (e) {}
+    try {
+      btn.click();
+    } catch (e) {}
+    return true;
+  }
+
   function clickBuyButton(card, amount) {
     const btn = findBuyButton(card);
     if (!btn || btn.disabled) return false;
@@ -554,12 +572,109 @@
     });
   }
 
+  let alarmAudio = null;
+  let alarmInterval = null;
+
+  function stopAlarm() {
+    if (alarmInterval) {
+      clearInterval(alarmInterval);
+      alarmInterval = null;
+    }
+    if (alarmAudio) {
+      try {
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
+      } catch (e) {}
+      alarmAudio = null;
+    }
+    const banner = document.getElementById("__arb_alarm_banner");
+    if (banner) banner.remove();
+  }
+
+  function playSynthAlarm() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [880, 1174.66, 1396.91, 1760];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.12);
+        osc.stop(ctx.currentTime + idx * 0.12 + 0.22);
+      });
+    } catch (e) {}
+  }
+
+  function showAlarmBanner(amount) {
+    let banner = document.getElementById("__arb_alarm_banner");
+    if (banner) banner.remove();
+
+    banner = document.createElement("div");
+    banner.id = "__arb_alarm_banner";
+    banner.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#00e676,#00b848);color:#06190f;padding:12px 24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,230,118,0.5);display:flex;align-items:center;gap:14px;font-family:system-ui,-apple-system,sans-serif;font-weight:700;font-size:15px;";
+
+    const amtStr = amount ? `₹${amount}` : "";
+    banner.innerHTML = `
+      <span>🎉 Order Successfully Bought! ${amtStr}</span>
+      <button id="__arb_stop_alarm_btn" style="background:#06190f;color:#00e676;border:0;padding:6px 14px;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;">🔇 Stop Alarm</button>
+    `;
+
+    (document.body || document.documentElement).appendChild(banner);
+    const stopBtn = document.getElementById("__arb_stop_alarm_btn");
+    if (stopBtn) {
+      stopBtn.onclick = () => stopAlarm();
+    }
+  }
+
+  function playSuccessAlarm(amount) {
+    if (settings.soundAlarm === false) return;
+
+    showAlarmBanner(amount);
+
+    const audioSrc = settings.customAudioData || (api && api.runtime ? api.runtime.getURL("alarm.mp3") : null);
+
+    const playAudioCycle = () => {
+      if (!audioSrc) return playSynthAlarm();
+      try {
+        if (!alarmAudio) {
+          alarmAudio = new Audio(audioSrc);
+        }
+        alarmAudio.currentTime = 0;
+        alarmAudio.play().catch(() => {
+          playSynthAlarm();
+        });
+      } catch (e) {
+        playSynthAlarm();
+      }
+    };
+
+    playAudioCycle();
+    let cycles = 0;
+    alarmInterval = setInterval(() => {
+      cycles++;
+      if (cycles > 8) {
+        stopAlarm();
+        return;
+      }
+      playAudioCycle();
+    }, 3500);
+  }
+
   function handleOrderSuccess(orderId, amount) {
     if (isPurchased) return;
     isPurchased = true;
     pendingOrder = null;
     log(`Order ₹${amount || "?"} (${orderId || "?"}) successfully purchased! Turning off buying process.`);
     stop();
+
+    // Sound alarm immediately to alert user
+    playSuccessAlarm(amount);
+
     try {
       api.runtime.sendMessage({
         type: "ORDER_PURCHASED",
@@ -674,7 +789,7 @@
         lastAttemptedOrder = pendingOrder;
         log(`AUTO-BUY: Sniping order ₹${amount} (${orderId})!`);
 
-        realClick(btn);
+        fastSnipeClick(btn);
 
         waitForBuyOutcome(pendingOrder);
         return;
@@ -703,6 +818,7 @@
 
   function start(s) {
     stop();
+    stopAlarm();
     isPurchased = false;
     isPaymentClicked = false;
     pendingOrder = null;
@@ -745,6 +861,11 @@
       }
 
       if (!running || isPurchased) return;
+
+      // Real-time zero-delay sniper: scan the exact millisecond Vue adds cards to DOM!
+      if (!pendingOrder && isOrderBookPage() && isIndividualMode()) {
+        scanOrders();
+      }
 
       // Only check failure toast if an order attempt is active
       if (pendingOrder) {
