@@ -669,16 +669,18 @@
     banner.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#00e676,#00b848);color:#06190f;padding:12px 24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,230,118,0.5);display:flex;align-items:center;gap:14px;font-family:system-ui,-apple-system,sans-serif;font-weight:700;font-size:15px;";
 
     const amtStr = amount ? `₹${amount}` : "";
-    banner.innerHTML = `
-      <span>🎉 Order Successfully Bought! ${amtStr}</span>
-      <button id="__arb_stop_alarm_btn" style="background:#06190f;color:#00e676;border:0;padding:6px 14px;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;">🔇 Stop Alarm</button>
-    `;
+    const textSpan = document.createElement("span");
+    textSpan.textContent = `🎉 Order Successfully Bought! ${amtStr}`;
 
+    const stopBtn = document.createElement("button");
+    stopBtn.id = "__arb_stop_alarm_btn";
+    stopBtn.style.cssText = "background:#06190f;color:#00e676;border:0;padding:6px 14px;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;";
+    stopBtn.textContent = "🔇 Stop Alarm";
+    stopBtn.onclick = () => stopAlarm();
+
+    banner.appendChild(textSpan);
+    banner.appendChild(stopBtn);
     (document.body || document.documentElement).appendChild(banner);
-    const stopBtn = document.getElementById("__arb_stop_alarm_btn");
-    if (stopBtn) {
-      stopBtn.onclick = () => stopAlarm();
-    }
   }
 
   function playSuccessAlarm(amount) {
