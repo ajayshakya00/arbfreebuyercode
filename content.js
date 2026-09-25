@@ -19,6 +19,7 @@
     autoPayment: true,
     soundAlarm: true,
     customAudioData: null,
+    refreshOption: "Large",
     paymentMethod: "ANY",
     customPayment: ""
   };
@@ -286,11 +287,15 @@
 
     if (popover && window.getComputedStyle(popover).display !== "none") {
       const actions = Array.from(popover.querySelectorAll(".van-popover__action, .van-popover__action-text, [role='menuitem'], [role='button'], div, span"));
-      const defaultAction = actions.find(el => (el.textContent || "").trim() === "Default") ||
-                            actions.find(el => (el.textContent || "").trim() === "Large") ||
+      const chosen = (settings.refreshOption || "Large").trim().toLowerCase();
+
+      // Find action matching user preference ("Large", "Default", or "Small")
+      const matchedAction = actions.find(el => (el.textContent || "").trim().toLowerCase() === chosen) ||
+                            actions.find(el => (el.textContent || "").trim().toLowerCase() === "large") ||
+                            actions.find(el => (el.textContent || "").trim().toLowerCase() === "default") ||
                             actions[0];
-      if (defaultAction) {
-        realClick(defaultAction);
+      if (matchedAction) {
+        realClick(matchedAction);
         return true;
       }
     }
@@ -1100,6 +1105,7 @@
         if (p.autoPayment !== undefined) settings.autoPayment = p.autoPayment;
         if (p.paymentMethod) settings.paymentMethod = p.paymentMethod;
         if (p.customPayment) settings.customPayment = p.customPayment;
+        if (p.refreshOption) settings.refreshOption = p.refreshOption;
       }
     }
   } catch(e) {}
