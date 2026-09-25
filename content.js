@@ -173,17 +173,62 @@
     return isIndividualMode();
   }
 
-  // Dynamic order book detector: works across any domain and route without relying on URLs
-  function isOrderBookPage() {
-    // If "Select Method Payment" or other payment/order screen is visible
+  // Detect if current screen is login/registration or logged out
+  function isLoginPage() {
+    const hash = (window.location.hash || "").toLowerCase();
+    const path = (window.location.pathname || "").toLowerCase();
+    if (hash.includes("login") || hash.includes("signin") || hash.includes("register") ||
+        path.includes("login") || path.includes("signin") || path.includes("register")) {
+      return true;
+    }
+
     const titleEl = document.querySelector(".van-nav-bar__title, .navbar .title, .van-nav-bar");
     const titleText = (titleEl ? titleEl.textContent : "").trim().toLowerCase();
-    if (titleText.includes("select method") || titleText.includes("payment")) {
-      return false;
+    if (titleText.includes("login") || titleText.includes("sign in") || titleText.includes("log in") || titleText.includes("register")) {
+      return true;
+    }
+
+    // Check for login forms / password inputs
+    if (document.querySelector("input[type='password'], .login-container, .login-wrap, .login-form")) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Detect if current screen is the payment / order confirmation page
+  function isPaymentOrOrderSuccessPage() {
+    if (isLoginPage()) return false;
+
+    if (document.querySelector(".bank-list")) return true;
+
+    const titleEl = document.querySelector(".van-nav-bar__title, .navbar .title, .van-nav-bar");
+    const titleText = (titleEl ? titleEl.textContent : "").trim().toLowerCase();
+    if (titleText.includes("select method") || titleText.includes("payment") || titleText.includes("order detail")) {
+      return true;
     }
 
     const hash = (window.location.hash || "").toLowerCase();
     if (hash && (hash.includes("/order/") || hash.includes("/detail") || hash.includes("/payment") || hash.includes("/pay/"))) {
+      return true;
+    }
+
+    if (document.querySelector(".order-detail, .order-info, .select-method, .pay-type, .pay-list")) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Dynamic order book detector: works across any domain and route without relying on URLs
+  function isOrderBookPage() {
+    // If login / logout screen is visible
+    if (isLoginPage()) {
+      return false;
+    }
+
+    // If "Select Method Payment" or other payment/order screen is visible
+    if (isPaymentOrOrderSuccessPage()) {
       return false;
     }
 
@@ -667,19 +712,43 @@
 
   function handleOrderSuccess(orderId, amount) {
     if (isPurchased) return;
+
+    // Safety guard: if on login page, definitely not an order success
+    if (isLoginPage()) {
+      log("Login page detected; not a successful order. Stopping bot.");
+      stop();
+      return;
+    }
+
+    // Strict guard: MUST have an active pending order to confirm success
+    const activeOrder = pendingOrder || lastAttemptedOrder;
+    if (!activeOrder && !orderId) {
+      log("Ignored order success: no active order attempt recorded");
+      return;
+    }
+
+    const finalOrderId = orderId || (activeOrder ? activeOrder.id : "");
+    const finalAmount = amount || (activeOrder ? activeOrder.amount : "");
+
+    // Must have a valid order ID or amount
+    if (!finalOrderId && !finalAmount) {
+      log("Ignored order success: missing order ID and amount");
+      return;
+    }
+
     isPurchased = true;
     pendingOrder = null;
-    log(`Order ₹${amount || "?"} (${orderId || "?"}) successfully purchased! Turning off buying process.`);
+    log(`Order ₹${finalAmount || "?"} (${finalOrderId || "?"}) successfully purchased! Turning off buying process.`);
     stop();
 
     // Sound alarm immediately to alert user
-    playSuccessAlarm(amount);
+    playSuccessAlarm(finalAmount);
 
     try {
       api.runtime.sendMessage({
         type: "ORDER_PURCHASED",
-        amount,
-        order: orderId
+        amount: finalAmount,
+        order: finalOrderId
       });
     } catch (e) {}
 
@@ -721,6 +790,14 @@
         return;
       }
 
+      // Check if logged out
+      if (isLoginPage()) {
+        clearInterval(checkTimer);
+        log("Logged out / login page detected while waiting for buy outcome. Marking order failed.");
+        handleOrderFailure(attempt.id, "Session expired / Logged out");
+        return;
+      }
+
       // 1. Check for failure toast
       const failToast = findFailureToast();
       if (failToast) {
@@ -732,8 +809,8 @@
         return;
       }
 
-      // 2. Check if screen navigated away from order book (Success!)
-      if (!isOrderBookPage()) {
+      // 2. Check if screen navigated to payment / order screen (Success!)
+      if (isPaymentOrOrderSuccessPage() || (!isOrderBookPage() && !isLoginPage())) {
         clearInterval(checkTimer);
         handleOrderSuccess(attempt.id, attempt.amount);
         return;
@@ -842,6 +919,13 @@
     settings.autoBuy = settings.autoBuy !== false;
     settings.autoPayment = settings.autoPayment !== false;
 
+    // If already on login page, abort start
+    if (isLoginPage()) {
+      log("Cannot start: User is logged out / on login page. Please log in first.");
+      stop();
+      return;
+    }
+
     // If already on payment screen at start, trigger payment method selection immediately
     if (document.querySelector(".bank-list") && settings.autoPayment !== false) {
       log("Already on Select Method Payment screen; auto-selecting payment method");
@@ -855,6 +939,13 @@
     // Watch DOM for when order is bought or screen switches away from buy list
     if (observer) observer.disconnect();
     observer = new MutationObserver(() => {
+      // Check if logged out / login page appeared
+      if (isLoginPage()) {
+        log("Logged out / login page detected in observer. Stopping bot.");
+        stop();
+        return;
+      }
+
       // Check if payment screen appeared
       if (document.querySelector(".bank-list") && settings.autoPayment !== false && !isPaymentClicked) {
         autoSelectPaymentMethod();
@@ -879,10 +970,10 @@
         }
       }
 
-      // Check if screen changed away from order book (e.g. payment screen reached)
-      if (!isOrderBookPage()) {
-        const orderId = pendingOrder ? pendingOrder.id : "";
-        const amount = pendingOrder ? pendingOrder.amount : "";
+      // Check if screen changed to payment/order screen strictly WHILE an order attempt is pending
+      if (pendingOrder && (isPaymentOrOrderSuccessPage() || !isOrderBookPage())) {
+        const orderId = pendingOrder.id;
+        const amount = pendingOrder.amount;
         handleOrderSuccess(orderId, amount);
       }
     });
@@ -975,7 +1066,8 @@
         running,
         tab: settings.tab || activeOnPage || "OTP-UPI",
         activeOnPage,
-        paymentMethod: settings.paymentMethod || "ANY"
+        paymentMethod: settings.paymentMethod || "ANY",
+        isLoginPage: isLoginPage()
       };
       if (sendResponse) sendResponse(res);
       return Promise.resolve(res);
@@ -983,9 +1075,15 @@
   };
 
   function checkNavigation() {
-    if (running && !isOrderBookPage()) {
-      const orderId = pendingOrder ? pendingOrder.id : "";
-      const amount = pendingOrder ? pendingOrder.amount : "";
+    if (isLoginPage()) {
+      log("Login page detected on navigation; stopping bot");
+      stop();
+      return;
+    }
+    // Strictly verify an order attempt is active before confirming success
+    if (running && pendingOrder && (isPaymentOrOrderSuccessPage() || !isOrderBookPage())) {
+      const orderId = pendingOrder.id;
+      const amount = pendingOrder.amount;
       handleOrderSuccess(orderId, amount);
     }
   }

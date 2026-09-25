@@ -220,6 +220,13 @@ async function handleToggle() {
     return;
   }
 
+  if (tab.url && /login|signin/i.test(tab.url)) {
+    const badge = $("statusBadge");
+    badge.textContent = "Please log in first";
+    badge.className = "badge badge-idle";
+    return;
+  }
+
   try {
     if (isRunning) {
       // Send STOP
@@ -404,7 +411,11 @@ $("sourceLink").onclick = (e) => {
     if (tab && tab.id && tab.url && /^https?:\/\//i.test(tab.url)) {
       const res = await sendTabMessage(tab.id, { type: "GET_STATUS" });
       if (res) {
-        if (typeof res.running === "boolean") {
+        if (res.isLoginPage) {
+          const badge = $("statusBadge");
+          badge.textContent = "Please log in";
+          badge.className = "badge badge-idle";
+        } else if (typeof res.running === "boolean") {
           updateUiState(res.running, res.tab);
         }
         if (!res.running && res.activeOnPage && !s.tab) {
