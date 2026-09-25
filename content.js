@@ -19,7 +19,6 @@
     autoPayment: true,
     soundAlarm: true,
     customAudioData: null,
-    refreshOption: "Large",
     paymentMethod: "ANY",
     customPayment: ""
   };
@@ -287,15 +286,11 @@
 
     if (popover && window.getComputedStyle(popover).display !== "none") {
       const actions = Array.from(popover.querySelectorAll(".van-popover__action, .van-popover__action-text, [role='menuitem'], [role='button'], div, span"));
-      const chosen = (settings.refreshOption || "Large").trim().toLowerCase();
-
-      // Find action matching user preference ("Large", "Default", or "Small")
-      const matchedAction = actions.find(el => (el.textContent || "").trim().toLowerCase() === chosen) ||
-                            actions.find(el => (el.textContent || "").trim().toLowerCase() === "large") ||
+      const defaultAction = actions.find(el => (el.textContent || "").trim() === "Default") ||
                             actions.find(el => (el.textContent || "").trim().toLowerCase() === "default") ||
                             actions[0];
-      if (matchedAction) {
-        realClick(matchedAction);
+      if (defaultAction) {
+        realClick(defaultAction);
         return true;
       }
     }
@@ -666,7 +661,7 @@
 
     banner = document.createElement("div");
     banner.id = "__arb_alarm_banner";
-    banner.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#00e676,#00b848);color:#06190f;padding:12px 24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,230,118,0.5);display:flex;align-items:center;gap:14px;font-family:system-ui,-apple-system,sans-serif;font-weight:700;font-size:15px;";
+    banner.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999999;background:linear-gradient(135deg,#00e676,#00b848);color:#06190f;padding:12px 18px;border-radius:12px;box-shadow:0 8px 32px rgba(0,230,118,0.5);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;font-family:system-ui,-apple-system,sans-serif;font-weight:700;font-size:14px;max-width:calc(100vw - 24px);box-sizing:border-box;text-align:center;";
 
     const amtStr = amount ? `₹${amount}` : "";
     const textSpan = document.createElement("span");
@@ -674,7 +669,7 @@
 
     const stopBtn = document.createElement("button");
     stopBtn.id = "__arb_stop_alarm_btn";
-    stopBtn.style.cssText = "background:#06190f;color:#00e676;border:0;padding:6px 14px;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;";
+    stopBtn.style.cssText = "background:#06190f;color:#00e676;border:0;padding:8px 16px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;min-height:36px;touch-action:manipulation;";
     stopBtn.textContent = "🔇 Stop Alarm";
     stopBtn.onclick = () => stopAlarm();
 
@@ -1107,7 +1102,6 @@
         if (p.autoPayment !== undefined) settings.autoPayment = p.autoPayment;
         if (p.paymentMethod) settings.paymentMethod = p.paymentMethod;
         if (p.customPayment) settings.customPayment = p.customPayment;
-        if (p.refreshOption) settings.refreshOption = p.refreshOption;
       }
     }
   } catch(e) {}

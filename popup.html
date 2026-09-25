@@ -2,292 +2,352 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
 <title>ARB Free Buyer</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  width:360px;
-  background:#0b120f;
-  color:#eaf5ee;
-  font:13px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  padding:16px;
-  user-select:none;
+:root {
+  color-scheme: dark;
 }
-.header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:14px;
-  padding-bottom:12px;
-  border-bottom:1px solid #1a2e23;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
-.brand{
-  display:flex;
-  align-items:center;
-  gap:10px;
+html {
+  background: #0b120f;
+  width: 100%;
 }
-.logo{
-  width:36px;
-  height:36px;
-  border-radius:9px;
-  object-fit:cover;
-  border:1px solid #21382c;
-  box-shadow:0 2px 8px rgba(0,230,118,0.2);
+body {
+  width: 100%;
+  min-width: 320px;
+  max-width: 480px;
+  margin: 0 auto;
+  background: #0b120f;
+  color: #eaf5ee;
+  font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 14px 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
 }
-.title-box h1{
-  font-size:17px;
-  font-weight:800;
-  background:linear-gradient(135deg,#00e676 0%,#69f0ae 100%);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  letter-spacing:-0.3px;
+@media (min-width: 500px) {
+  body {
+    width: 375px;
+  }
 }
-.title-box small{
-  font-size:11px;
-  color:#799a88;
-  font-weight:500;
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #1a2e23;
+  gap: 8px;
 }
-.badge{
-  display:inline-flex;
-  align-items:center;
-  gap:5px;
-  padding:4px 10px;
-  border-radius:12px;
-  font-size:11px;
-  font-weight:700;
-  letter-spacing:0.3px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.badge-idle{
-  background:#14221a;
-  color:#7da590;
-  border:1px solid #233b2e;
+.logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid #21382c;
+  box-shadow: 0 2px 8px rgba(0,230,118,0.2);
+  flex-shrink: 0;
 }
-.badge-running{
-  background:rgba(0,230,118,0.15);
-  color:#00e676;
-  border:1px solid rgba(0,230,118,0.4);
-  box-shadow:0 0 10px rgba(0,230,118,0.25);
-  animation:pulseBadge 1.8s infinite ease-in-out;
+.title-box h1 {
+  font-size: 17px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #00e676 0%, #69f0ae 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
 }
-@keyframes pulseBadge{
-  0%,100%{opacity:0.9}
-  50%{opacity:1;box-shadow:0 0 14px rgba(0,230,118,0.45)}
+.title-box small {
+  font-size: 11px;
+  color: #799a88;
+  font-weight: 500;
+  display: block;
 }
-.card{
-  background:#121c17;
-  border:1px solid #1e3328;
-  border-radius:12px;
-  padding:12px;
-  margin-bottom:10px;
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.label{
-  display:block;
-  color:#7fa893;
-  font-size:11px;
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:0.5px;
-  margin-bottom:6px;
+.badge-idle {
+  background: #14221a;
+  color: #7da590;
+  border: 1px solid #233b2e;
 }
-.label .hint{
-  text-transform:none;
-  font-size:10px;
-  font-weight:600;
-  color:#668a76;
-  margin-left:3px;
+.badge-running {
+  background: rgba(0,230,118,0.15);
+  color: #00e676;
+  border: 1px solid rgba(0,230,118,0.4);
+  box-shadow: 0 0 10px rgba(0,230,118,0.25);
+  animation: pulseBadge 1.8s infinite ease-in-out;
 }
-.segmented-control{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:4px;
-  background:#0b130f;
-  padding:3px;
-  border-radius:10px;
-  margin-bottom:10px;
-  border:1px solid #1a2c22;
+@keyframes pulseBadge {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; box-shadow: 0 0 14px rgba(0,230,118,0.45); }
 }
-.seg-btn{
-  background:transparent;
-  color:#7fa893;
-  border:0;
-  padding:7px;
-  border-radius:8px;
-  font-size:12px;
-  font-weight:700;
-  cursor:pointer;
-  transition:all 0.2s;
+.card {
+  background: #121c17;
+  border: 1px solid #1e3328;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
 }
-.seg-btn.active{
-  background:linear-gradient(135deg,#00e676 0%,#00c853 100%);
-  color:#06190f;
-  box-shadow:0 2px 10px rgba(0,230,118,0.35);
+.label {
+  display: block;
+  color: #7fa893;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
 }
-.input-wrap{
-  position:relative;
+.label .hint {
+  text-transform: none;
+  font-size: 10px;
+  font-weight: 600;
+  color: #668a76;
+  margin-left: 3px;
 }
-.currency{
-  position:absolute;
-  left:10px;
-  top:50%;
-  transform:translateY(-50%);
-  color:#5c806e;
-  font-weight:700;
+.segmented-control {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: #0b130f;
+  padding: 3px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #1a2c22;
 }
-input,select{
-  width:100%;
-  background:#0b130f;
-  color:#f0faf4;
-  border:1px solid #21382c;
-  border-radius:8px;
-  padding:8px 10px;
-  font-size:13px;
-  outline:none;
-  transition:border-color 0.2s,box-shadow 0.2s;
+.seg-btn {
+  background: transparent;
+  color: #7fa893;
+  border: 0;
+  padding: 8px;
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
 }
-input:focus,select:focus{
-  border-color:#00e676;
-  box-shadow:0 0 0 2px rgba(0,230,118,0.25);
+.seg-btn.active {
+  background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+  color: #06190f;
+  box-shadow: 0 2px 10px rgba(0,230,118,0.35);
 }
-.input-wrap input{
-  padding-left:24px;
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
-.grid-2{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
+.currency {
+  position: absolute;
+  left: 12px;
+  color: #5c806e;
+  font-weight: 700;
+  font-size: 14px;
+  pointer-events: none;
 }
-.toggle-row{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
+input, select {
+  width: 100%;
+  background: #0b130f;
+  color: #f0faf4;
+  border: 1px solid #21382c;
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 14px;
+  min-height: 42px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
 }
-.toggle-info b{
-  font-size:13px;
-  color:#f0faf4;
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237fa893' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  padding-right: 34px;
+  cursor: pointer;
 }
-.toggle-info small{
-  display:block;
-  color:#799a88;
-  font-size:11px;
+input:focus, select:focus {
+  border-color: #00e676;
+  box-shadow: 0 0 0 2px rgba(0,230,118,0.25);
 }
-.switch{
-  position:relative;
-  display:inline-block;
-  width:38px;
-  height:22px;
-  flex-shrink:0;
+.input-wrap input {
+  padding-left: 28px;
 }
-.switch input{
-  opacity:0;
-  width:0;
-  height:0;
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
-.slider{
-  position:absolute;
-  cursor:pointer;
-  top:0;left:0;right:0;bottom:0;
-  background-color:#17261f;
-  transition:0.25s;
-  border-radius:22px;
-  border:1px solid #254032;
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  gap: 12px;
 }
-.slider:before{
-  position:absolute;
-  content:"";
-  height:16px;
-  width:16px;
-  left:2px;
-  bottom:2px;
-  background-color:#7fa893;
-  transition:0.25s;
-  border-radius:50%;
+.toggle-info b {
+  font-size: 13px;
+  color: #f0faf4;
+  display: block;
 }
-input:checked + .slider{
-  background-color:#00e676;
-  border-color:#00e676;
+.toggle-info small {
+  display: block;
+  color: #799a88;
+  font-size: 11px;
 }
-input:checked + .slider:before{
-  transform:translateX(16px);
-  background-color:#061a10;
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  pointer-events: none;
 }
-.btn-toggle{
-  width:100%;
-  border:0;
-  border-radius:10px;
-  padding:12px;
-  font-size:14px;
-  font-weight:800;
-  cursor:pointer;
-  letter-spacing:0.4px;
-  transition:all 0.25s cubic-bezier(0.4,0,0.2,1);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  box-shadow:0 4px 14px rgba(0,0,0,0.4);
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
 }
-.btn-start{
-  background:linear-gradient(135deg,#00e676 0%,#00b848 100%);
-  color:#06190f;
+.slider {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #17261f;
+  transition: 0.25s;
+  border-radius: 24px;
+  border: 1px solid #254032;
 }
-.btn-start:hover{
-  background:linear-gradient(135deg,#1aff87 0%,#00cc50 100%);
-  transform:translateY(-1px);
-  box-shadow:0 6px 18px rgba(0,230,118,0.4);
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #7fa893;
+  transition: 0.25s;
+  border-radius: 50%;
 }
-.btn-start:active{
-  transform:translateY(1px);
+input:checked + .slider {
+  background-color: #00e676;
+  border-color: #00e676;
 }
-.btn-stop{
-  background:linear-gradient(135deg,#e53935 0%,#b71c1c 100%);
-  color:#fff;
-  box-shadow:0 4px 14px rgba(229,57,53,0.35);
+input:checked + .slider:before {
+  transform: translateX(18px);
+  background-color: #061a10;
 }
-.btn-stop:hover{
-  background:linear-gradient(135deg,#f44336 0%,#c62828 100%);
-  transform:translateY(-1px);
-  box-shadow:0 6px 18px rgba(229,57,53,0.5);
+.btn-toggle {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 48px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.4px;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  touch-action: manipulation;
 }
-.btn-stop:active{
-  transform:translateY(1px);
+.btn-start {
+  background: linear-gradient(135deg, #00e676 0%, #00b848 100%);
+  color: #06190f;
 }
-.footer{
-  margin-top:14px;
-  text-align:center;
-  padding-top:10px;
-  border-top:1px solid #1a2e23;
+.btn-start:hover {
+  background: linear-gradient(135deg, #1aff87 0%, #00cc50 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,230,118,0.4);
 }
-.btn-source{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:7px;
-  background:#121c17;
-  color:#b2d4c3;
-  text-decoration:none;
-  font-size:12px;
-  font-weight:700;
-  padding:7px 16px;
-  border-radius:8px;
-  border:1px solid #21382c;
-  cursor:pointer;
-  transition:all 0.2s cubic-bezier(0.4,0,0.2,1);
-  box-shadow:0 2px 6px rgba(0,0,0,0.25);
+.btn-start:active {
+  transform: translateY(1px);
 }
-.btn-source:hover{
-  background:#182821;
-  color:#00e676;
-  border-color:#00e676;
-  box-shadow:0 3px 12px rgba(0,230,118,0.25);
-  transform:translateY(-1px);
+.btn-stop {
+  background: linear-gradient(135deg, #e53935 0%, #b71c1c 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(229,57,53,0.35);
 }
-.btn-source:active{
-  transform:translateY(1px);
+.btn-stop:hover {
+  background: linear-gradient(135deg, #f44336 0%, #c62828 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(229,57,53,0.5);
 }
-.btn-source svg{
-  width:14px;
-  height:14px;
-  fill:currentColor;
+.btn-stop:active {
+  transform: translateY(1px);
+}
+.footer {
+  margin-top: 14px;
+  text-align: center;
+  padding-top: 10px;
+  border-top: 1px solid #1a2e23;
+}
+.btn-source {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: #121c17;
+  color: #b2d4c3;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 14px;
+  min-height: 40px;
+  border-radius: 9px;
+  border: 1px solid #21382c;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  touch-action: manipulation;
+  box-sizing: border-box;
+}
+.btn-source:hover {
+  background: #182821;
+  color: #00e676;
+  border-color: #00e676;
+  box-shadow: 0 3px 12px rgba(0,230,118,0.25);
+  transform: translateY(-1px);
+}
+.btn-source:active {
+  transform: translateY(1px);
+}
+.btn-source svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
 }
 </style>
 </head>
@@ -306,14 +366,14 @@ input:checked + .slider:before{
 
 <div class="card">
   <div class="segmented-control">
-    <button id="fixedBtn" class="seg-btn">Fixed Amount</button>
-    <button id="rangeBtn" class="seg-btn active">Range</button>
+    <button id="fixedBtn" type="button" class="seg-btn">Fixed Amount</button>
+    <button id="rangeBtn" type="button" class="seg-btn active">Range</button>
   </div>
   <div id="fixedBox" style="display:none">
-    <label class="label">Fixed Amount</label>
+    <label class="label" for="fixed">Fixed Amount</label>
     <div class="input-wrap">
       <span class="currency">₹</span>
-      <input id="fixed" type="number" min="0" step="any" value="100" placeholder="Amount">
+      <input id="fixed" type="number" min="0" step="any" value="100" placeholder="Amount" inputmode="decimal">
     </div>
   </div>
   <div id="rangeBox">
@@ -321,30 +381,30 @@ input:checked + .slider:before{
     <div class="grid-2">
       <div class="input-wrap">
         <span class="currency">₹</span>
-        <input id="min" type="number" min="0" step="any" value="100" placeholder="Min">
+        <input id="min" type="number" min="0" step="any" value="100" placeholder="Min" inputmode="decimal">
       </div>
       <div class="input-wrap">
         <span class="currency">₹</span>
-        <input id="max" type="number" min="0" step="any" value="50000" placeholder="Max">
+        <input id="max" type="number" min="0" step="any" value="50000" placeholder="Max" inputmode="decimal">
       </div>
     </div>
   </div>
 </div>
 
 <div class="card">
-  <div class="toggle-row" style="margin-bottom:10px">
+  <label class="toggle-row" style="margin-bottom:10px">
     <div class="toggle-info">
       <b>Auto Refresh</b>
       <small>Requests fresh orders continuously</small>
     </div>
-    <label class="switch">
+    <div class="switch">
       <input id="refresh" type="checkbox" checked>
       <span class="slider"></span>
-    </label>
-  </div>
+    </div>
+  </label>
   <div class="grid-2">
     <div>
-      <label class="label">Target Tab</label>
+      <label class="label" for="tabSelect">Target Tab</label>
       <select id="tabSelect">
         <option value="OTP-UPI">OTP-UPI (+5%)</option>
         <option value="UPI">UPI</option>
@@ -354,46 +414,38 @@ input:checked + .slider:before{
       </select>
     </div>
     <div>
-      <label class="label">Latency (ms) <span class="hint">(min 200)</span></label>
-      <input id="latency" type="number" min="0" step="10" value="500">
+      <label class="label" for="latency">Latency (ms) <span class="hint">(min 200)</span></label>
+      <input id="latency" type="number" min="0" step="10" value="500" inputmode="numeric">
     </div>
-  </div>
-  <div style="margin-top:8px">
-    <label class="label">Refresh Filter Option</label>
-    <select id="refreshOption">
-      <option value="Large" selected>Large (Recommended)</option>
-      <option value="Default">Default</option>
-      <option value="Small">Small</option>
-    </select>
   </div>
 </div>
 
 <div class="card">
-  <div class="toggle-row">
+  <label class="toggle-row">
     <div class="toggle-info">
       <b>Auto Buy</b>
       <small>Instantly clicks Buy when match is found</small>
     </div>
-    <label class="switch">
+    <div class="switch">
       <input id="autoBuy" type="checkbox" checked>
       <span class="slider"></span>
-    </label>
-  </div>
+    </div>
+  </label>
 </div>
 
 <div class="card">
-  <div class="toggle-row" style="margin-bottom:10px">
+  <label class="toggle-row" style="margin-bottom:10px">
     <div class="toggle-info">
       <b>Auto Payment Method</b>
       <small>Auto-selects payment method on success</small>
     </div>
-    <label class="switch">
+    <div class="switch">
       <input id="autoPayment" type="checkbox" checked>
       <span class="slider"></span>
-    </label>
-  </div>
+    </div>
+  </label>
   <div id="paymentMethodWrap">
-    <label class="label">Preferred Method</label>
+    <label class="label" for="paymentMethod">Preferred Method</label>
     <select id="paymentMethod">
       <option value="ANY">First Available Account</option>
       <option value="phonepe">PhonePe</option>
@@ -405,39 +457,39 @@ input:checked + .slider:before{
       <option value="custom">Custom (UPI / Name)</option>
     </select>
     <div id="customPaymentBox" style="display:none; margin-top:8px">
-      <label class="label">Custom UPI / Keyword</label>
+      <label class="label" for="customPayment">Custom UPI / Keyword</label>
       <input id="customPayment" type="text" placeholder="e.g. ajay.shakya20@ybl or @superyes">
     </div>
   </div>
 </div>
 
 <div class="card">
-  <div class="toggle-row" style="margin-bottom:10px">
+  <label class="toggle-row" style="margin-bottom:10px">
     <div class="toggle-info">
       <b>Sound Alarm on Success</b>
       <small>Plays loud audio alert when order is bought</small>
     </div>
-    <label class="switch">
+    <div class="switch">
       <input id="soundAlarm" type="checkbox" checked>
       <span class="slider"></span>
-    </label>
-  </div>
+    </div>
+  </label>
   <div style="display:flex; gap:8px; align-items:center;">
-    <button id="testAlarmBtn" type="button" class="btn-source" style="flex:1; padding:7px 10px; font-size:11px;">
+    <button id="testAlarmBtn" type="button" class="btn-source" style="flex:1; padding:9px 10px; font-size:12px;">
       🔔 Test Alarm
     </button>
-    <label for="customAudioInput" class="btn-source" style="flex:1; padding:7px 10px; font-size:11px; cursor:pointer; text-align:center;">
+    <label for="customAudioInput" class="btn-source" style="flex:1; padding:9px 10px; font-size:12px; cursor:pointer; text-align:center;">
       📁 Attach Audio
       <input id="customAudioInput" type="file" accept="audio/*" style="display:none">
     </label>
   </div>
-  <div id="customAudioInfo" style="display:none; margin-top:8px; padding:6px 10px; background:#0b130f; border-radius:6px; border:1px solid #1a2c22; font-size:11px; color:#799a88; align-items:center; justify-content:space-between;">
-    <span id="customAudioName" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px;"></span>
-    <button id="removeCustomAudio" type="button" title="Remove custom audio" style="background:transparent; border:0; color:#e53935; cursor:pointer; font-weight:700; font-size:13px; margin-left:6px; line-height:1;">✕</button>
+  <div id="customAudioInfo" style="display:none; margin-top:8px; padding:8px 12px; background:#0b130f; border-radius:8px; border:1px solid #1a2c22; font-size:12px; color:#799a88; align-items:center; justify-content:space-between;">
+    <span id="customAudioName" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:210px;"></span>
+    <button id="removeCustomAudio" type="button" title="Remove custom audio" style="background:transparent; border:0; color:#e53935; cursor:pointer; font-weight:700; font-size:16px; min-width:32px; min-height:32px; display:inline-flex; align-items:center; justify-content:center; line-height:1;">✕</button>
   </div>
 </div>
 
-<button id="toggleBtn" class="btn-toggle btn-start">
+<button id="toggleBtn" type="button" class="btn-toggle btn-start">
   ▶ Start Buying
 </button>
 

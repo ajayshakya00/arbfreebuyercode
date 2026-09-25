@@ -56,7 +56,6 @@ function savePreferences(updateUi = false) {
     soundAlarm: $("soundAlarm").checked,
     customAudioData: customAudioData || null,
     customAudioFileName: customAudioFileName || "",
-    refreshOption: $("refreshOption").value || "Large",
     paymentMethod: $("paymentMethod").value,
     customPayment: $("customPayment").value
   };
@@ -92,7 +91,7 @@ async function loadPreferences() {
       const extStored = await api.storage.local.get([
         "mode", "min", "max", "fixed", "latency", "refresh", "autoBuy",
         "autoPayment", "soundAlarm", "customAudioData", "customAudioFileName",
-        "refreshOption", "paymentMethod", "customPayment", "tab"
+        "paymentMethod", "customPayment", "tab"
       ]);
       if (extStored && Object.keys(extStored).length > 0) {
         prefs = extStored;
@@ -249,7 +248,6 @@ async function handleToggle() {
         autoPayment: $("autoPayment").checked,
         soundAlarm: $("soundAlarm").checked,
         customAudioData: customAudioData || null,
-        refreshOption: $("refreshOption").value || "Large",
         paymentMethod: $("paymentMethod").value,
         customPayment: $("customPayment").value
       });
@@ -376,7 +374,7 @@ $("sourceLink").onclick = (e) => {
   $(id).addEventListener("change", () => savePreferences(true));
   $(id).addEventListener("blur", () => savePreferences(true));
 });
-["tabSelect", "refresh", "autoBuy", "soundAlarm", "refreshOption"].forEach(id => {
+["tabSelect", "refresh", "autoBuy", "autoPayment", "soundAlarm"].forEach(id => {
   $(id).addEventListener("change", () => savePreferences(true));
 });
 
@@ -392,7 +390,6 @@ $("sourceLink").onclick = (e) => {
   $("autoBuy").checked = s.autoBuy !== false;
   $("autoPayment").checked = s.autoPayment !== false;
   $("soundAlarm").checked = s.soundAlarm !== false;
-  $("refreshOption").value = s.refreshOption || "Large";
   customAudioData = s.customAudioData || null;
   customAudioFileName = s.customAudioFileName || "";
   $("paymentMethod").value = s.paymentMethod || "ANY";
