@@ -6,7 +6,6 @@
   let isPurchased = false;
   let isPaymentClicked = false;
   let pendingOrder = null;
-  const failedOrders = new Set();
   let settings = {
     mode: "range",
     min: 100,
@@ -30,11 +29,15 @@
     } catch(e) {}
   }
 
-  // Ensure any lingering debug box from previous versions is completely removed
+  // Ensure any lingering debug box or failed styles from previous versions are completely removed
   function removeOldDebug() {
     try {
       const box = document.getElementById("__otp_monitor_debug");
       if (box) box.remove();
+    } catch(e) {}
+    try {
+      const oldFailedStyle = document.getElementById("__arb_failed_styles");
+      if (oldFailedStyle) oldFailedStyle.remove();
     } catch(e) {}
   }
   removeOldDebug();
@@ -342,8 +345,9 @@
     const now = Date.now();
     if (isRefreshing && (now - refreshLockTime < 2000)) return;
 
-    // Don't refresh if page is currently busy with loading spinner
-    if (document.querySelector(".van-loading, .van-toast--loading")) return;
+    // Don't refresh if page is currently showing an active loading spinner
+    const loadingEl = document.querySelector(".van-loading, .van-toast--loading");
+    if (loadingEl && (loadingEl.offsetWidth > 0 || loadingEl.offsetHeight > 0)) return;
 
     // If currently in range mode, switch to individual mode once and exit
     if (isRangeMode()) {
@@ -429,7 +433,7 @@
 
   let lastAttemptedOrder = null;
 
-  // Capture manual user clicks as well so if an order fails, it gets blacklisted too
+  // Track manual user clicks to assist with order tracking and payment navigation
   document.addEventListener("click", (e) => {
     const card = e.target.closest("[platformorder], .item");
     if (!card) return;
@@ -484,72 +488,33 @@
     return amount >= Number(settings.min) && amount <= Number(settings.max);
   }
 
-  // Fast single-element toast lookup (0.01ms)
+  // Fast comprehensive toast/popup lookup across all toast & dialog elements
   function findFailureToast() {
-    const toast = document.querySelector(".van-toast, .van-popup, [class*='toast']");
-    if (!toast || toast.getAttribute("data-arb-seen") === "true") return null;
-    const txt = (toast.textContent || "").trim();
-    if (!txt) return null;
-    if (
-      /bought by someone else/i.test(txt) ||
-      /someone else/i.test(txt) ||
-      /already bought/i.test(txt) ||
-      /already taken/i.test(txt) ||
-      /no longer available/i.test(txt) ||
-      /order.*expired/i.test(txt) ||
-      /order.*not exist/i.test(txt) ||
-      /order.*invalid/i.test(txt) ||
-      /please buy another order/i.test(txt) ||
-      /已被他人购买|已被抢|订单已失效/.test(txt)
-    ) {
-      return { element: toast, text: txt };
+    const list = document.querySelectorAll(".van-toast, .van-dialog, [class*='toast'], .van-popup--center, [role='dialog'], [role='alert']");
+    for (let i = 0; i < list.length; i++) {
+      const el = list[i];
+      if (el.getAttribute("data-arb-seen") === "true") continue;
+      // Skip elements that are completely hidden
+      if (el.offsetParent === null && el.offsetWidth === 0 && el.offsetHeight === 0) continue;
+      const txt = (el.textContent || "").trim();
+      if (!txt) continue;
+      if (
+        /bought by someone else/i.test(txt) ||
+        /someone else/i.test(txt) ||
+        /already bought/i.test(txt) ||
+        /already taken/i.test(txt) ||
+        /no longer available/i.test(txt) ||
+        /order.*expired/i.test(txt) ||
+        /order.*not exist/i.test(txt) ||
+        /order.*invalid/i.test(txt) ||
+        /please buy another/i.test(txt) ||
+        /please refresh/i.test(txt) ||
+        /已被他人购买|已被抢|订单已失效|已被买走|手慢了/.test(txt)
+      ) {
+        return { element: el, text: txt };
+      }
     }
     return null;
-  }
-
-  // High-performance pure CSS injection for failed orders
-  // 0ms ongoing CPU overhead, automatically persists across all Vue re-renders natively!
-  let failedStyleEl = null;
-  function updateFailedStyles() {
-    if (failedOrders.size === 0) return;
-    if (!failedStyleEl) {
-      failedStyleEl = document.createElement("style");
-      failedStyleEl.id = "__arb_failed_styles";
-      (document.head || document.documentElement).appendChild(failedStyleEl);
-    }
-    const selectors = [];
-    for (const po of failedOrders) {
-      if (po && po.length > 3) {
-        selectors.push(`[platformorder="${po}"]`);
-      }
-    }
-    if (selectors.length === 0) return;
-    const selStr = selectors.join(", ");
-    failedStyleEl.textContent = `
-      ${selStr} {
-        opacity: 0.6 !important;
-      }
-      ${selectors.map(s => `${s} button, ${s} .btn, ${s} .x-btn, ${s} .van-button`).join(", ")} {
-        opacity: 0.4 !important;
-        filter: grayscale(60%) !important;
-        pointer-events: none !important;
-        cursor: not-allowed !important;
-        transition: none !important;
-      }
-      ${selectors.map(s => `${s} .van-button__text`).join(", ")} {
-        visibility: hidden !important;
-        position: relative !important;
-      }
-      ${selectors.map(s => `${s} .van-button__text::after`).join(", ")} {
-        content: "Sold Out" !important;
-        visibility: visible !important;
-        position: absolute !important;
-        left: 50% !important;
-        top: 0 !important;
-        transform: translateX(-50%) !important;
-        white-space: nowrap !important;
-      }
-    `;
   }
 
   function findPaymentRow(preference = "ANY", customKeyword = "") {
@@ -849,29 +814,20 @@
   }
 
   function handleOrderFailure(orderId, reason) {
-    log(`Order (${orderId || "?"}) failed: "${reason}". Keeping monitoring active...`);
-    if (orderId) failedOrders.add(orderId);
-    const attempt = pendingOrder || lastAttemptedOrder;
-    if (attempt) {
-      if (attempt.po) failedOrders.add(attempt.po);
-      if (attempt.id) failedOrders.add(attempt.id);
-    }
+    log(`Order (${orderId || "?"}) not confirmed / failed: "${reason}". Keeping order active and resuming monitoring...`);
     pendingOrder = null;
 
-    // Apply native CSS rules - 0ms CPU overhead, persistent across Vue re-renders
-    updateFailedStyles();
-
-    // Fast refresh to fetch latest orders
+    // Fast refresh to fetch latest orders immediately
     setTimeout(() => {
       if (running && !isPurchased) {
         refreshOrders();
       }
-    }, 80);
+    }, 40);
   }
 
   function waitForBuyOutcome(attempt) {
-    const checkInterval = 50;
-    const timeout = 15000;
+    const checkInterval = 40;
+    const timeout = 1800; // Fast 1.8s timeout: don't freeze sniper when order is taken by someone else
     const startTime = Date.now();
 
     const checkTimer = setInterval(() => {
@@ -883,12 +839,12 @@
       // Check if logged out
       if (isLoginPage()) {
         clearInterval(checkTimer);
-        log("Logged out / login page detected while waiting for buy outcome. Marking order failed.");
+        log("Logged out / login page detected while waiting for buy outcome.");
         handleOrderFailure(attempt.id, "Session expired / Logged out");
         return;
       }
 
-      // 1. Check for failure toast
+      // 1. Check for failure toast across all toast elements
       const failToast = findFailureToast();
       if (failToast) {
         clearInterval(checkTimer);
@@ -913,16 +869,18 @@
         return;
       }
 
-      // Do not time out while page is busy loading
-      if (document.querySelector(".van-loading, .van-toast--loading")) {
-        return;
+      // 4. Check if loading spinner is currently visible
+      const loadingEl = document.querySelector(".van-loading, .van-toast--loading");
+      const isVisibleLoading = loadingEl && (loadingEl.offsetWidth > 0 || loadingEl.offsetHeight > 0);
+      if (isVisibleLoading && (Date.now() - startTime < 3000)) {
+        return; // Allow briefly up to 3.0s only while active loading spinner is visible
       }
 
-      // 4. Timeout check: still on order book without navigation after timeout
+      // 5. Timeout check: still on order book without confirmation -> order failed/taken by someone else
       if (Date.now() - startTime >= timeout) {
         clearInterval(checkTimer);
-        log(`Order (${attempt.id}) confirmation timed out on order book. Marking failed and refreshing.`);
-        handleOrderFailure(attempt.id, "Timeout - order not confirmed");
+        log(`Order (${attempt.id}) not confirmed within ${timeout}ms. Resuming monitoring immediately.`);
+        handleOrderFailure(attempt.id, "Order taken or not confirmed");
       }
     }, checkInterval);
   }
@@ -936,26 +894,21 @@
     const len = cards.length;
     if (len === 0) return;
 
-    let hasAvailable = false;
     for (let i = 0; i < len; i++) {
       const card = cards[i];
       const po = card.getAttribute("platformorder");
-      if (po && failedOrders.has(po)) continue;
 
       const amount = parseAmount(card);
       if (!matches(amount)) continue;
 
       const orderId = po || getOrderId(card, amount);
-      if (failedOrders.has(orderId)) continue;
-
-      hasAvailable = true;
 
       if (settings.autoBuy) {
         const btn = findBuyButton(card);
         if (!btn || btn.disabled) continue;
 
         const now = Date.now();
-        if (btn._lastClickTime && (now - btn._lastClickTime < 500)) return;
+        if (btn._lastClickTime && (now - btn._lastClickTime < 500)) continue;
         btn._lastClickTime = now;
 
         pendingOrder = {
