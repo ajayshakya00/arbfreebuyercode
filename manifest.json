@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ARB Free Buyer",
-  "version": "2.6.3",
+  "version": "2.6.4",
   "description": "ARB Free Buyer - Automated order monitor and sniper (OTP-UPI, UPI, BANK, Quick, USDT).",
   "browser_specific_settings": {
     "gecko": {

@@ -177,19 +177,21 @@
   function isLoginPage() {
     const hash = (window.location.hash || "").toLowerCase();
     const path = (window.location.pathname || "").toLowerCase();
-    if (hash.includes("login") || hash.includes("signin") || hash.includes("register") ||
-        path.includes("login") || path.includes("signin") || path.includes("register")) {
+
+    // If clearly on login/registration route
+    if (hash.startsWith("#/login") || hash.startsWith("#/register") || hash.startsWith("#/forgot") ||
+        path.startsWith("/login") || path.startsWith("/register")) {
       return true;
     }
 
-    const titleEl = document.querySelector(".van-nav-bar__title, .navbar .title, .van-nav-bar");
-    const titleText = (titleEl ? titleEl.textContent : "").trim().toLowerCase();
-    if (titleText.includes("login") || titleText.includes("sign in") || titleText.includes("log in") || titleText.includes("register")) {
-      return true;
+    // Never consider it a login page if on order book, order detail, payment, or buy routes
+    if (hash.includes("/buy/") || hash.includes("/order/") || hash.includes("/payment") || hash.includes("/pay") || hash.includes("/home")) {
+      return false;
     }
 
-    // Check for login forms / password inputs
-    if (document.querySelector("input[type='password'], .login-container, .login-wrap, .login-form")) {
+    // Only if visible login form is rendered on an unauthenticated page
+    const visibleLoginWrap = document.querySelector(".login-container, .login-wrap, form.login-form");
+    if (visibleLoginWrap && visibleLoginWrap.offsetParent !== null) {
       return true;
     }
 
@@ -200,16 +202,27 @@
   function isPaymentOrOrderSuccessPage() {
     if (isLoginPage()) return false;
 
-    if (document.querySelector(".bank-list")) return true;
-
-    const titleEl = document.querySelector(".van-nav-bar__title, .navbar .title, .van-nav-bar");
-    const titleText = (titleEl ? titleEl.textContent : "").trim().toLowerCase();
-    if (titleText.includes("select method") || titleText.includes("payment") || titleText.includes("order detail")) {
+    // Check DOM elements for payment page or order completion/cashier
+    if (document.querySelector(".x-payment, .x-payment-payList, .x-payment-box, .bank-list, .x-popup-order")) {
       return true;
     }
 
     const hash = (window.location.hash || "").toLowerCase();
-    if (hash && (hash.includes("/order/") || hash.includes("/detail") || hash.includes("/payment") || hash.includes("/pay/"))) {
+    if (hash && (
+      hash.includes("/order/index") ||
+      hash.includes("/order/cashier") ||
+      hash.includes("/order/detail") ||
+      hash.includes("/order/") ||
+      hash.includes("/payment") ||
+      hash.includes("/pay") ||
+      hash.includes("/home/buy")
+    )) {
+      return true;
+    }
+
+    const titleEl = document.querySelector(".van-nav-bar__title, .navbar .title, .van-nav-bar");
+    const titleText = (titleEl ? titleEl.textContent : "").trim().toLowerCase();
+    if (titleText.includes("select method") || titleText.includes("payment") || titleText.includes("cashier") || titleText.includes("order detail")) {
       return true;
     }
 
@@ -217,6 +230,25 @@
       return true;
     }
 
+    return false;
+  }
+
+  // Automatically check and click the order popup (.x-popup-order) to redirect to payment page
+  function checkOrderPopup() {
+    const popup = document.querySelector(".x-popup-order");
+    if (!popup) return false;
+    try {
+      if (window.getComputedStyle(popup).display === "none") return false;
+    } catch(e) {}
+
+    const btn = popup.querySelector(".btn.x-btn, .btn, button, .van-button");
+    if (btn && !btn.disabled) {
+      log("Order popup detected (.x-popup-order). Auto-clicking to redirect to payment page...");
+      realClick(btn);
+      const child = btn.querySelector(".van-button__text, .van-button__content");
+      if (child) realClick(child);
+      return true;
+    }
     return false;
   }
 
@@ -339,19 +371,34 @@
     return card.querySelector("button, .btn, .x-btn, .van-button");
   }
 
-  // Ultra-fast buy button click with ZERO layout reflow and ZERO focus delay (sub-millisecond)
+  // Ultra-fast buy button click with comprehensive event dispatch and child targeting
   function fastSnipeClick(btn) {
     if (!btn || btn.disabled) return false;
     try {
-      const opts = { bubbles: true, cancelable: true, view: window, buttons: 1, button: 0 };
-      btn.dispatchEvent(new PointerEvent("pointerdown", opts));
-      btn.dispatchEvent(new MouseEvent("mousedown", opts));
-      btn.dispatchEvent(new PointerEvent("pointerup", opts));
-      btn.dispatchEvent(new MouseEvent("mouseup", opts));
-    } catch (e) {}
+      btn.scrollIntoView({ block: "nearest", inline: "nearest" });
+      btn.focus();
+    } catch(e) {}
+
+    const opts = { bubbles: true, cancelable: true, view: window, buttons: 1, button: 0 };
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
+      try { btn.dispatchEvent(new MouseEvent(type, opts)); } catch(e) {}
+    }
     try {
-      btn.click();
-    } catch (e) {}
+      if (typeof Touch !== "undefined" && typeof TouchEvent !== "undefined") {
+        const t = new Touch({ identifier: Date.now(), target: btn, clientX: 100, clientY: 100 });
+        btn.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: [t], targetTouches: [t] }));
+        btn.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true, touches: [], targetTouches: [] }));
+      }
+    } catch(e) {}
+    try { btn.click(); } catch(e) {}
+
+    const child = btn.querySelector(".van-button__text, .van-button__content");
+    if (child) {
+      for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
+        try { child.dispatchEvent(new MouseEvent(type, opts)); } catch(e) {}
+      }
+      try { child.click(); } catch(e) {}
+    }
     return true;
   }
 
@@ -506,18 +553,61 @@
   }
 
   function findPaymentRow(preference = "ANY", customKeyword = "") {
+    let target = (preference || "ANY").trim().toLowerCase();
+    if (target === "custom" && customKeyword) {
+      target = customKeyword.trim().toLowerCase();
+    }
+    if (!target) target = "any";
+
+    // 1. Check .x-payment-payList (used on /order/index cashier screen)
+    const payList = document.querySelector(".x-payment-payList, .payList");
+    if (payList) {
+      const items = [...payList.querySelectorAll(".item, [class*='item']")];
+      if (items.length > 0) {
+        if (target === "any") {
+          return {
+            element: items[0],
+            section: "Payment List",
+            text: items[0].innerText.replace(/\n+/g, " ").trim() || "First Available"
+          };
+        }
+        for (const it of items) {
+          const cls = (it.className || "").toLowerCase();
+          const txt = (it.textContent || "").toLowerCase();
+          if (
+            (target === "phonepe" && (cls.includes("phonepe") || txt.includes("phonepe") || txt.includes("@ybl") || txt.includes("@ibl") || txt.includes("@axl"))) ||
+            (target === "paytm" && (cls.includes("paytm") || txt.includes("paytm") || txt.includes("@paytm"))) ||
+            (target === "supermoney" && (cls.includes("supermoney") || txt.includes("supermoney") || txt.includes("@superyes"))) ||
+            (target === "navi" && (cls.includes("navi") || txt.includes("navi") || txt.includes("@naviaxis"))) ||
+            (target === "freecharge" && (cls.includes("freecharge") || txt.includes("freecharge"))) ||
+            (target === "moneyview" && (cls.includes("moneyview") || txt.includes("moneyview"))) ||
+            ((target === "gpay" || target === "googlepay") && (cls.includes("gpay") || txt.includes("google") || txt.includes("@okhdfcbank") || txt.includes("@okaxis") || txt.includes("@oksbi") || txt.includes("@okicici"))) ||
+            (target === "bhim" && (cls.includes("bhim") || txt.includes("bhim") || txt.includes("@upi"))) ||
+            cls.includes(target) || txt.includes(target)
+          ) {
+            return {
+              element: it,
+              section: "Payment List",
+              text: it.innerText.replace(/\n+/g, " ").trim()
+            };
+          }
+        }
+        // Fallback to first item if target not explicitly matched
+        return {
+          element: items[0],
+          section: "Payment List (Fallback)",
+          text: items[0].innerText.replace(/\n+/g, " ").trim()
+        };
+      }
+    }
+
+    // 2. Check .bank-list (used on select method payment screens)
     const bankList = document.querySelector(".bank-list");
     if (!bankList) return null;
 
     const itemContainers = bankList.querySelectorAll(".item.select");
     const selectedSection = itemContainers[0] || null;
     const anotherSection = itemContainers[1] || null;
-
-    let target = (preference || "ANY").trim().toLowerCase();
-    if (target === "custom" && customKeyword) {
-      target = customKeyword.trim().toLowerCase();
-    }
-    if (!target) target = "any";
 
     function rowMatches(row) {
       if (!row) return false;
@@ -722,20 +812,18 @@
       return;
     }
 
-    // Strict guard: MUST have an active pending order to confirm success
     const activeOrder = pendingOrder || lastAttemptedOrder;
-    if (!activeOrder && !orderId) {
-      log("Ignored order success: no active order attempt recorded");
-      return;
-    }
+    let finalOrderId = orderId || (activeOrder ? activeOrder.id : "");
+    let finalAmount = amount || (activeOrder ? activeOrder.amount : "");
 
-    const finalOrderId = orderId || (activeOrder ? activeOrder.id : "");
-    const finalAmount = amount || (activeOrder ? activeOrder.amount : "");
-
-    // Must have a valid order ID or amount
-    if (!finalOrderId && !finalAmount) {
-      log("Ignored order success: missing order ID and amount");
-      return;
+    if (!finalAmount) {
+      try {
+        const amtEl = document.querySelector(".x-payment .amount, .x-payment-top .amount, [class*='amount']");
+        if (amtEl) {
+          const digits = (amtEl.textContent || "").replace(/[^\d.]/g, "");
+          if (digits) finalAmount = digits;
+        }
+      } catch (e) {}
     }
 
     isPurchased = true;
@@ -783,7 +871,7 @@
 
   function waitForBuyOutcome(attempt) {
     const checkInterval = 50;
-    const timeout = 3000;
+    const timeout = 15000;
     const startTime = Date.now();
 
     const checkTimer = setInterval(() => {
@@ -811,14 +899,26 @@
         return;
       }
 
-      // 2. Check if screen navigated to payment / order screen (Success!)
+      // 2. Check if Order Popup appeared (.x-popup-order)
+      if (checkOrderPopup()) {
+        clearInterval(checkTimer);
+        handleOrderSuccess(attempt.id, attempt.amount);
+        return;
+      }
+
+      // 3. Check if screen navigated to payment / order screen (Success!)
       if (isPaymentOrOrderSuccessPage() || (!isOrderBookPage() && !isLoginPage())) {
         clearInterval(checkTimer);
         handleOrderSuccess(attempt.id, attempt.amount);
         return;
       }
 
-      // 3. Timeout check: still on order book without navigation after timeout
+      // Do not time out while page is busy loading
+      if (document.querySelector(".van-loading, .van-toast--loading")) {
+        return;
+      }
+
+      // 4. Timeout check: still on order book without navigation after timeout
       if (Date.now() - startTime >= timeout) {
         clearInterval(checkTimer);
         log(`Order (${attempt.id}) confirmation timed out on order book. Marking failed and refreshing.`);
@@ -929,8 +1029,8 @@
     }
 
     // If already on payment screen at start, trigger payment method selection immediately
-    if (document.querySelector(".bank-list") && settings.autoPayment !== false) {
-      log("Already on Select Method Payment screen; auto-selecting payment method");
+    if ((document.querySelector(".x-payment, .x-payment-payList, .bank-list") || isPaymentOrOrderSuccessPage()) && settings.autoPayment !== false) {
+      log("Already on payment screen; auto-selecting payment method");
       autoSelectPaymentMethod();
       return;
     }
@@ -948,8 +1048,16 @@
         return;
       }
 
+      // Auto-click Order Popup (.x-popup-order) if shown
+      if (checkOrderPopup()) {
+        const orderId = pendingOrder ? pendingOrder.id : (lastAttemptedOrder ? lastAttemptedOrder.id : "");
+        const amount = pendingOrder ? pendingOrder.amount : (lastAttemptedOrder ? lastAttemptedOrder.amount : "");
+        handleOrderSuccess(orderId, amount);
+        return;
+      }
+
       // Check if payment screen appeared
-      if (document.querySelector(".bank-list") && settings.autoPayment !== false && !isPaymentClicked) {
+      if ((document.querySelector(".x-payment, .x-payment-payList, .bank-list") || isPaymentOrOrderSuccessPage()) && settings.autoPayment !== false && !isPaymentClicked) {
         autoSelectPaymentMethod();
       }
 
@@ -972,10 +1080,10 @@
         }
       }
 
-      // Check if screen changed to payment/order screen strictly WHILE an order attempt is pending
-      if (pendingOrder && (isPaymentOrOrderSuccessPage() || !isOrderBookPage())) {
-        const orderId = pendingOrder.id;
-        const amount = pendingOrder.amount;
+      // Check if screen changed to payment/order screen
+      if (isPaymentOrOrderSuccessPage() || (!isOrderBookPage() && !isLoginPage())) {
+        const orderId = pendingOrder ? pendingOrder.id : (lastAttemptedOrder ? lastAttemptedOrder.id : "");
+        const amount = pendingOrder ? pendingOrder.amount : (lastAttemptedOrder ? lastAttemptedOrder.amount : "");
         handleOrderSuccess(orderId, amount);
       }
     });
@@ -1082,10 +1190,15 @@
       stop();
       return;
     }
-    // Strictly verify an order attempt is active before confirming success
-    if (running && pendingOrder && (isPaymentOrOrderSuccessPage() || !isOrderBookPage())) {
-      const orderId = pendingOrder.id;
-      const amount = pendingOrder.amount;
+    if (checkOrderPopup()) {
+      const orderId = pendingOrder ? pendingOrder.id : (lastAttemptedOrder ? lastAttemptedOrder.id : "");
+      const amount = pendingOrder ? pendingOrder.amount : (lastAttemptedOrder ? lastAttemptedOrder.amount : "");
+      handleOrderSuccess(orderId, amount);
+      return;
+    }
+    if (running && (isPaymentOrOrderSuccessPage() || (!isOrderBookPage() && !isLoginPage()))) {
+      const orderId = pendingOrder ? pendingOrder.id : (lastAttemptedOrder ? lastAttemptedOrder.id : "");
+      const amount = pendingOrder ? pendingOrder.amount : (lastAttemptedOrder ? lastAttemptedOrder.amount : "");
       handleOrderSuccess(orderId, amount);
     }
   }
