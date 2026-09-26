@@ -517,6 +517,98 @@
     return null;
   }
 
+  // Helper: determine if an element or its children match the desired payment method
+  function elementMatchesTarget(el, target, customKeyword = "") {
+    if (!el) return false;
+    if (
+      el.classList.contains("disabled") ||
+      el.getAttribute("aria-disabled") === "true" ||
+      el.disabled
+    ) {
+      return false;
+    }
+    if (target === "any") return true;
+
+    const rawText = (el.innerText || el.textContent || "").toLowerCase();
+    const cleanText = rawText.replace(/[\s\-_]/g, "");
+    const cls = (el.className || "").toString().toLowerCase();
+    const cleanCls = cls.replace(/[\s\-_]/g, "");
+    const elId = (el.id || "").toLowerCase().replace(/[\s\-_]/g, "");
+
+    // 1. Check all nested images, SVGs, and background styles
+    const imgs = el.querySelectorAll("img, svg, [style*='background']");
+    for (let i = 0; i < imgs.length; i++) {
+      const img = imgs[i];
+      const src = (img.getAttribute("src") || "").toLowerCase().replace(/[\s\-_]/g, "");
+      const alt = (img.getAttribute("alt") || "").toLowerCase().replace(/[\s\-_]/g, "");
+      const title = (img.getAttribute("title") || "").toLowerCase().replace(/[\s\-_]/g, "");
+      const imgCls = (img.className || "").toString().toLowerCase().replace(/[\s\-_]/g, "");
+
+      if (target === "phonepe" && (src.includes("phonepe") || alt.includes("phonepe") || title.includes("phonepe") || imgCls.includes("phonepe") || src.includes("phone-pe") || src.includes("phone_pe") || src.includes("ybl"))) return true;
+      if (target === "paytm" && (src.includes("paytm") || alt.includes("paytm") || title.includes("paytm") || imgCls.includes("paytm"))) return true;
+      if (target === "supermoney" && (src.includes("supermoney") || alt.includes("supermoney") || title.includes("supermoney") || imgCls.includes("supermoney"))) return true;
+      if (target === "navi" && (src.includes("navi") || alt.includes("navi") || imgCls.includes("navi"))) return true;
+      if (target === "freecharge" && (src.includes("freecharge") || alt.includes("freecharge") || imgCls.includes("freecharge"))) return true;
+      if (target === "moneyview" && (src.includes("moneyview") || alt.includes("moneyview") || imgCls.includes("moneyview"))) return true;
+      if ((target === "gpay" || target === "googlepay") && (src.includes("gpay") || src.includes("google") || alt.includes("gpay") || alt.includes("google") || imgCls.includes("gpay"))) return true;
+      if (target === "bhim" && (src.includes("bhim") || alt.includes("bhim") || imgCls.includes("bhim"))) return true;
+      if (target === "cred" && (src.includes("cred") || alt.includes("cred") || imgCls.includes("cred"))) return true;
+      if (customKeyword && (src.includes(customKeyword) || alt.includes(customKeyword))) return true;
+    }
+
+    // 2. Check data attributes on el or children
+    const dataAttrs = ["data-type", "data-name", "data-channel", "data-method", "data-code", "data-pay", "data-val"];
+    for (const attr of dataAttrs) {
+      const val = (el.getAttribute(attr) || "").toLowerCase().replace(/[\s\-_]/g, "");
+      if (target === "phonepe" && (val.includes("phonepe") || val.includes("ybl"))) return true;
+      if (target === "paytm" && val.includes("paytm")) return true;
+      if (target === "supermoney" && val.includes("supermoney")) return true;
+      if (target === "navi" && val.includes("navi")) return true;
+      if ((target === "gpay" || target === "googlepay") && (val.includes("gpay") || val.includes("google"))) return true;
+      if (target === "bhim" && val.includes("bhim")) return true;
+      if (customKeyword && val.includes(customKeyword)) return true;
+    }
+
+    // 3. Text & Class checks per payment target
+    if (target === "phonepe") {
+      return cleanText.includes("phonepe") || cleanCls.includes("phonepe") || elId.includes("phonepe") ||
+             cleanText.includes("@ybl") || cleanText.includes("@ibl") || cleanText.includes("@axl") ||
+             rawText.includes("phone pe") || rawText.includes("phonepe");
+    }
+    if (target === "paytm") {
+      return cleanText.includes("paytm") || cleanCls.includes("paytm") || elId.includes("paytm") || cleanText.includes("@paytm");
+    }
+    if (target === "supermoney") {
+      return cleanText.includes("supermoney") || cleanText.includes("super.money") || cleanCls.includes("supermoney") || cleanText.includes("@superyes");
+    }
+    if (target === "navi") {
+      return cleanText.includes("navi") || cleanCls.includes("navi") || cleanText.includes("@naviaxis");
+    }
+    if (target === "freecharge") {
+      return cleanText.includes("freecharge") || cleanCls.includes("freecharge");
+    }
+    if (target === "moneyview") {
+      return cleanText.includes("moneyview") || cleanCls.includes("moneyview");
+    }
+    if (target === "gpay" || target === "googlepay") {
+      return cleanText.includes("gpay") || cleanText.includes("googlepay") || cleanText.includes("google") ||
+             cleanCls.includes("gpay") || cleanText.includes("@okhdfcbank") || cleanText.includes("@okaxis") || cleanText.includes("@oksbi") || cleanText.includes("@okicici");
+    }
+    if (target === "bhim") {
+      return cleanText.includes("bhim") || cleanCls.includes("bhim") || cleanText.includes("@upi");
+    }
+    if (target === "cred") {
+      return cleanText.includes("cred") || cleanCls.includes("cred");
+    }
+    if (target === "custom" && customKeyword) {
+      const k = customKeyword.trim().toLowerCase();
+      const cleanK = k.replace(/[\s\-_]/g, "");
+      return cleanText.includes(cleanK) || rawText.includes(k) || cls.includes(k);
+    }
+
+    return cleanText.includes(target) || cleanCls.includes(target);
+  }
+
   function findPaymentRow(preference = "ANY", customKeyword = "") {
     let target = (preference || "ANY").trim().toLowerCase();
     if (target === "custom" && customKeyword) {
@@ -524,125 +616,145 @@
     }
     if (!target) target = "any";
 
-    // 1. Check .x-payment-payList (used on /order/index cashier screen)
-    const payList = document.querySelector(".x-payment-payList, .payList");
-    if (payList) {
-      const items = [...payList.querySelectorAll(".item, [class*='item']")];
-      if (items.length > 0) {
-        if (target === "any") {
+    // Pass 1: Check known container items (.x-payment-payList, .payList, .bank-list, .x-payment, etc.)
+    const listContainers = document.querySelectorAll(
+      ".x-payment-payList, .payList, .bank-list, .x-payment, .pay-list, .van-radio-group, .van-cell-group, .payment-list, .select-method"
+    );
+    for (let c = 0; c < listContainers.length; c++) {
+      const container = listContainers[c];
+      const rows = [...container.querySelectorAll(".item, .x-row, .van-cell, .van-radio, [class*='item'], [role='radio'], [role='button']")];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (elementMatchesTarget(row, target, customKeyword)) {
           return {
-            element: items[0],
-            section: "Payment List",
-            text: items[0].innerText.replace(/\n+/g, " ").trim() || "First Available"
+            element: row,
+            section: "Payment List Item",
+            text: (row.innerText || row.textContent || "").replace(/\n+/g, " ").trim()
           };
         }
-        for (const it of items) {
-          const cls = (it.className || "").toLowerCase();
-          const txt = (it.textContent || "").toLowerCase();
-          if (
-            (target === "phonepe" && (cls.includes("phonepe") || txt.includes("phonepe") || txt.includes("@ybl") || txt.includes("@ibl") || txt.includes("@axl"))) ||
-            (target === "paytm" && (cls.includes("paytm") || txt.includes("paytm") || txt.includes("@paytm"))) ||
-            (target === "supermoney" && (cls.includes("supermoney") || txt.includes("supermoney") || txt.includes("@superyes"))) ||
-            (target === "navi" && (cls.includes("navi") || txt.includes("navi") || txt.includes("@naviaxis"))) ||
-            (target === "freecharge" && (cls.includes("freecharge") || txt.includes("freecharge"))) ||
-            (target === "moneyview" && (cls.includes("moneyview") || txt.includes("moneyview"))) ||
-            ((target === "gpay" || target === "googlepay") && (cls.includes("gpay") || txt.includes("google") || txt.includes("@okhdfcbank") || txt.includes("@okaxis") || txt.includes("@oksbi") || txt.includes("@okicici"))) ||
-            (target === "bhim" && (cls.includes("bhim") || txt.includes("bhim") || txt.includes("@upi"))) ||
-            cls.includes(target) || txt.includes(target)
-          ) {
-            return {
-              element: it,
-              section: "Payment List",
-              text: it.innerText.replace(/\n+/g, " ").trim()
-            };
-          }
+      }
+    }
+
+    // Pass 2: Global scan for ANY element on the screen matching the target
+    if (target !== "any") {
+      const allCandidates = document.querySelectorAll(
+        "[class*='phonepe'], [class*='paytm'], [class*='upi'], [class*='item'], [class*='row'], " +
+        ".van-cell, .van-radio, button, div, span, p, img, a"
+      );
+      for (let i = 0; i < allCandidates.length; i++) {
+        const el = allCandidates[i];
+        if (elementMatchesTarget(el, target, customKeyword)) {
+          const clickable = el.closest(".item, .x-row, .van-cell, .van-radio, button, [role='button'], [class*='item']") || el;
+          return {
+            element: clickable,
+            section: "Global Screen Match",
+            text: (clickable.innerText || clickable.textContent || "").replace(/\n+/g, " ").trim()
+          };
         }
-        // Fallback to first item if target not explicitly matched
-        return {
-          element: items[0],
-          section: "Payment List (Fallback)",
-          text: items[0].innerText.replace(/\n+/g, " ").trim()
-        };
       }
     }
 
-    // 2. Check .bank-list (used on select method payment screens)
-    const bankList = document.querySelector(".bank-list");
-    if (!bankList) return null;
-
-    const itemContainers = bankList.querySelectorAll(".item.select");
-    const selectedSection = itemContainers[0] || null;
-    const anotherSection = itemContainers[1] || null;
-
-    function rowMatches(row) {
-      if (!row) return false;
-      if (
-        row.classList.contains("action") ||
-        row.classList.contains("disabled") ||
-        row.getAttribute("aria-disabled") === "true"
-      ) {
-        return false;
-      }
-      if (target === "any") return true;
-
-      const classes = (row.className || "").toLowerCase();
-      const text = (row.textContent || "").toLowerCase();
-
-      // Check specific bank aliases
-      if (target === "phonepe" && (classes.includes("phonepe") || text.includes("phonepe") || text.includes("@ybl") || text.includes("@ibl") || text.includes("@axl"))) return true;
-      if (target === "paytm" && (classes.includes("paytm") || text.includes("paytm") || text.includes("@paytm"))) return true;
-      if (target === "supermoney" && (classes.includes("supermoney") || text.includes("supermoney") || text.includes("super.money") || text.includes("@superyes"))) return true;
-      if (target === "navi" && (classes.includes("navi") || text.includes("navi") || text.includes("@naviaxis"))) return true;
-      if (target === "freecharge" && (classes.includes("freecharge") || text.includes("freecharge"))) return true;
-      if (target === "moneyview" && (classes.includes("moneyview") || text.includes("moneyview"))) return true;
-      if ((target === "gpay" || target === "googlepay") && (classes.includes("gpay") || text.includes("gpay") || text.includes("google") || text.includes("@okhdfcbank") || text.includes("@okaxis") || text.includes("@oksbi") || text.includes("@okicici"))) return true;
-      if (target === "bhim" && (classes.includes("bhim") || text.includes("bhim") || text.includes("@upi"))) return true;
-      if (target === "cred" && (classes.includes("cred") || text.includes("cred"))) return true;
-
-      return classes.includes(target) || text.includes(target);
-    }
-
-    // Step 1: First check on selected accounts
-    if (selectedSection) {
-      const selectedRows = [...selectedSection.querySelectorAll(".x-row")];
-      const match1 = selectedRows.find(rowMatches);
-      if (match1) {
-        return {
-          element: match1,
-          section: "Selected Account",
-          text: match1.innerText.replace(/\n+/g, " ").trim()
-        };
+    // Pass 3: If target is "any", pick first available clickable payment row
+    if (target === "any") {
+      for (let c = 0; c < listContainers.length; c++) {
+        const rows = [...listContainers[c].querySelectorAll(".item, .x-row, .van-cell, .van-radio")];
+        if (rows.length > 0) {
+          return {
+            element: rows[0],
+            section: "First Available",
+            text: (rows[0].innerText || rows[0].textContent || "").replace(/\n+/g, " ").trim() || "First Available"
+          };
+        }
       }
     }
 
-    // Step 2: Then check in use another account
-    if (anotherSection) {
-      const anotherRows = [...anotherSection.querySelectorAll(".x-row")];
-      const match2 = anotherRows.find(rowMatches);
-      if (match2) {
-        return {
-          element: match2,
-          section: "Use Another Account",
-          text: match2.innerText.replace(/\n+/g, " ").trim()
-        };
-      }
-    }
-
+    // NO premature fallback when searching for a specific method like PhonePe!
     return null;
   }
 
-  function autoSelectPaymentMethod(timeout = 6000) {
-    if (settings.autoPayment === false || isPaymentClicked) return Promise.resolve(false);
+  // Click any primary confirmation / submit button on the payment cashier screen if present
+  function clickPaymentSubmitButton() {
+    const candidates = document.querySelectorAll(
+      ".x-payment .btn, .x-payment button, .x-payment-btn, .x-payment-bottom button, " +
+      ".van-button--primary, .van-button--danger, .submit-btn, .pay-btn, .btn-pay, " +
+      "button[class*='pay'], button[class*='confirm'], button[class*='submit'], " +
+      ".bank-list ~ button, .x-payment-payList ~ button, .payList ~ button, .van-button"
+    );
+    for (let i = 0; i < candidates.length; i++) {
+      const btn = candidates[i];
+      if (btn.disabled || btn.getAttribute("aria-disabled") === "true") continue;
+      if (btn.offsetWidth === 0 && btn.offsetHeight === 0) continue;
+      const txt = (btn.textContent || "").trim().toLowerCase();
+      if (txt.includes("cancel") || txt.includes("back") || txt.includes("return")) continue;
+      if (
+        txt.includes("pay") || txt.includes("confirm") || txt.includes("submit") ||
+        txt.includes("proceed") || txt.includes("continue") || txt.includes("支付") || txt.includes("确认") ||
+        btn.classList.contains("van-button--primary") || btn.classList.contains("btn-pay")
+      ) {
+        log(`AUTO-PAY: Clicking payment cashier confirmation button: "${txt}"`);
+        realClick(btn);
+        const child = btn.querySelector(".van-button__text, .van-button__content");
+        if (child) realClick(child);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Multi-tier click to ensure PhonePe is activated across all Vue / mobile event handlers
+  function clickPaymentElement(el) {
+    if (!el) return false;
+    try { el.scrollIntoView({ block: "nearest", inline: "nearest" }); } catch(e) {}
+    try { el.focus(); } catch(e) {}
+
+    // Dispatch full mouse & pointer & touch events
+    const opts = { bubbles: true, cancelable: true, view: window, buttons: 1, button: 0 };
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"]) {
+      try { el.dispatchEvent(new MouseEvent(type, opts)); } catch(e) {}
+    }
+    try {
+      if (typeof Touch !== "undefined" && typeof TouchEvent !== "undefined") {
+        const t = new Touch({ identifier: Date.now(), target: el, clientX: 100, clientY: 100 });
+        el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: [t], targetTouches: [t] }));
+        el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true, touches: [], targetTouches: [] }));
+      }
+    } catch(e) {}
+    try { el.click(); } catch(e) {}
+
+    // Also click any radio button, checkbox, button, icon, or text child
+    const innerTargets = el.querySelectorAll("input[type='radio'], input[type='checkbox'], .van-radio, .van-radio__icon, .van-radio__label, button, .btn, .x-btn, .van-button, .van-cell__title, .van-cell__value, [role='radio'], img, span");
+    for (let i = 0; i < innerTargets.length; i++) {
+      const child = innerTargets[i];
+      try { child.dispatchEvent(new MouseEvent("click", opts)); } catch(e) {}
+      try { child.click(); } catch(e) {}
+    }
+
+    // After 250ms, check if there is an explicit "Pay / Confirm" button on the cashier screen
+    setTimeout(() => {
+      clickPaymentSubmitButton();
+    }, 250);
+
+    return true;
+  }
+
+  let isPaymentSelecting = false;
+
+  function autoSelectPaymentMethod(timeout = 10000) {
+    if (settings.autoPayment === false || isPaymentClicked || isPaymentSelecting) return Promise.resolve(false);
 
     const preference = settings.paymentMethod || "ANY";
     const customKeyword = settings.customPayment || "";
     if (preference === "none") return Promise.resolve(false);
 
+    isPaymentSelecting = true;
     const start = Date.now();
+    log(`AUTO-PAY: Actively scanning for payment method "${preference}" (timeout=${timeout}ms)...`);
+
     return new Promise(resolve => {
       const checkIntv = setInterval(() => {
         if (isPaymentClicked) {
           clearInterval(checkIntv);
+          isPaymentSelecting = false;
           return resolve(true);
         }
 
@@ -650,8 +762,9 @@
         if (match && match.element) {
           clearInterval(checkIntv);
           isPaymentClicked = true;
-          log(`AUTO-PAY: Selected [${match.section}] "${match.text}" (target: ${preference}). Clicking...`);
-          realClick(match.element);
+          isPaymentSelecting = false;
+          log(`AUTO-PAY: Successfully identified [${match.section}] "${match.text}" (target: ${preference}). Clicking...`);
+          clickPaymentElement(match.element);
           try {
             api.runtime.sendMessage({
               type: "PAYMENT_METHOD_CLICKED",
@@ -665,7 +778,8 @@
 
         if (Date.now() - start >= timeout) {
           clearInterval(checkIntv);
-          log(`AUTO-PAY: Timeout waiting for payment method "${preference}"`);
+          isPaymentSelecting = false;
+          log(`AUTO-PAY: Timeout after ${timeout}ms waiting for payment method "${preference}"`);
           resolve(false);
         }
       }, 50);
@@ -768,7 +882,12 @@
   }
 
   function handleOrderSuccess(orderId, amount) {
-    if (isPurchased) return;
+    if (isPurchased) {
+      if (settings.autoPayment !== false && !isPaymentClicked) {
+        autoSelectPaymentMethod(10000);
+      }
+      return;
+    }
 
     // Safety guard: if on login page, definitely not an order success
     if (isLoginPage()) {
@@ -794,7 +913,14 @@
     isPurchased = true;
     pendingOrder = null;
     log(`Order ₹${finalAmount || "?"} (${finalOrderId || "?"}) successfully purchased! Turning off buying process.`);
-    stop();
+
+    // Halt buying and refreshing loops while keeping the payment watcher running
+    running = false;
+    isRefreshing = false;
+    isSwitchingMode = false;
+    if (timer) clearInterval(timer);
+    if (scanTimer) clearInterval(scanTimer);
+    timer = scanTimer = null;
 
     // Sound alarm immediately to alert user
     playSuccessAlarm(finalAmount);
@@ -809,7 +935,7 @@
 
     // Auto-select payment method on order success
     if (settings.autoPayment !== false) {
-      autoSelectPaymentMethod();
+      autoSelectPaymentMethod(10000);
     }
   }
 
@@ -1149,6 +1275,11 @@
       handleOrderSuccess(orderId, amount);
       return;
     }
+    if ((document.querySelector(".x-payment, .x-payment-payList, .bank-list") || isPaymentOrOrderSuccessPage()) && settings.autoPayment !== false && !isPaymentClicked) {
+      log("Payment screen reached on navigation; triggering autoSelectPaymentMethod");
+      autoSelectPaymentMethod(10000);
+      return;
+    }
     if (running && (isPaymentOrOrderSuccessPage() || (!isOrderBookPage() && !isLoginPage()))) {
       const orderId = pendingOrder ? pendingOrder.id : (lastAttemptedOrder ? lastAttemptedOrder.id : "");
       const amount = pendingOrder ? pendingOrder.amount : (lastAttemptedOrder ? lastAttemptedOrder.amount : "");
@@ -1171,6 +1302,12 @@
       }
     }
   } catch(e) {}
+
+  // If already on payment / cashier screen on load or reload, auto-select payment method
+  if ((document.querySelector(".x-payment, .x-payment-payList, .bank-list") || isPaymentOrOrderSuccessPage()) && settings.autoPayment !== false && !isPaymentClicked) {
+    log("Payment / cashier page detected on script load; triggering auto-select payment method");
+    autoSelectPaymentMethod(10000);
+  }
 
   window.__arbBuyerMessageListener = messageHandler;
   api.runtime.onMessage.addListener(messageHandler);
